@@ -3963,30 +3963,37 @@
 
     let deferred = null;
     const instBtn = document.getElementById('btnInstall');
-    window.addEventListener('beforeinstallprompt', (ev) => {
-      ev.preventDefault();
-      deferred = ev;
-      if (instBtn) instBtn.style.display = '';
-    });
-    window.addEventListener('appinstalled', () => {
-      if (instBtn) instBtn.style.display = 'none';
-    });
-    if (instBtn) {
-      instBtn.addEventListener('click', () => {
-        if (!deferred) return;
-        deferred.prompt();
-        deferred.userChoice.then((r) => {
-          if (r && r.outcome === 'accepted' && instBtn) instBtn.style.display = 'none';
-          deferred = null;
-        }).catch(() => {});
-      });
-    }
-    const ua = navigator.userAgent || '';
-    if (/iPad|iPhone|iPod/.test(ua) && !window.navigator.standalone && instBtn) {
+    const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+    if (instBtn && !isStandalone) {
       instBtn.style.display = '';
-      instBtn.textContent = '⬇ 分享 → 添加到主屏幕';
+      window.addEventListener('beforeinstallprompt', (ev) => {
+        ev.preventDefault();
+        deferred = ev;
+      });
+      window.addEventListener('appinstalled', () => { instBtn.style.display = 'none'; });
       instBtn.addEventListener('click', () => {
-        alert('点 Safari 底部的「分享」按钮，选择「添加到主屏幕」');
+        if (deferred) {
+          deferred.prompt();
+          deferred.userChoice.then((r) => {
+            if (r && r.outcome === 'accepted') instBtn.style.display = 'none';
+            deferred = null;
+          }).catch(() => {});
+          return;
+        }
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua);
+        const isAnd = /Android/.test(ua);
+        showEvent({
+          who: '安装到桌面',
+          title: '装成一个 App',
+          text: isIOS
+            ? '点 Safari 底部中间的「分享」按钮 → 往下找「添加到主屏幕」→ 点「添加」。'
+            : isAnd
+              ? '点 Chrome 右上角「⋮」→ 选「安装应用」（有的版本叫「添加到主屏幕」）→ 点「安装」。'
+              : '手机浏览器里打开本页，用「添加到主屏幕」即可；电脑上可拖到桌面。',
+          options: [{ label: '知道了', onPick: () => {} }]
+        });
       });
     }
 
@@ -3998,6 +4005,7 @@
 </script>
 </body>
 </html>
+
 
 
 
