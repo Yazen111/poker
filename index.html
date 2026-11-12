@@ -1,0 +1,4086 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="theme-color" content="#04100c">
+<meta name="color-scheme" content="dark">
+<title>德州扑克 · 2 / 4 / 6 人场</title>
+<style>
+  :root{
+    --cw: clamp(34px, 4vw, 50px);
+    --cwy: clamp(38px, 4.8vw, 62px);
+    --cwb: clamp(40px, 5.2vw, 64px);
+    --gold:#e8c879;
+    --ink:#e8f2ec;
+    --dim:#7f9c92;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#05080a;color:var(--ink);overflow:hidden;
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #app{display:flex;flex-direction:column;height:100dvh}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{display:flex;align-items:center;gap:12px;padding:9px 16px 5px;flex:0 0 auto;flex-wrap:wrap}
+  .brand{font-size:14.5px;font-weight:700;letter-spacing:.12em;color:#dfeee7;white-space:nowrap}
+  .brand span{color:var(--gold);font-weight:600;letter-spacing:.18em;font-size:10.5px}
+  .topbar .spacer{flex:1}
+  .info{display:flex;gap:12px;font-size:11.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+  .info b{color:#cfe3da;font-weight:600}
+  .ghost{background:transparent;border:1px solid rgba(140,190,170,.28);color:#a9c6ba;
+    padding:5px 12px;border-radius:999px;font-size:11.5px;cursor:pointer;letter-spacing:.06em;transition:.16s}
+  .ghost:hover{border-color:rgba(232,200,121,.6);color:var(--gold)}
+  .mini{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#c6dbd1;
+    border-radius:8px;padding:4px 7px;font-size:11px;letter-spacing:.03em;cursor:pointer;outline:none}
+  .mini:hover{border-color:rgba(232,200,121,.45)}
+
+  /* ---------- 布局 ---------- */
+  .layout{flex:1;min-height:0;display:grid;grid-template-columns:1fr 284px;gap:12px;padding:2px 8px 2px;
+    transition:grid-template-columns .3s ease}
+  #app.side-closed .layout{grid-template-columns:1fr 0px;gap:0}
+  .stage{min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+
+  .table{
+    position:relative;width:100%;
+    max-width:min(1560px, calc((100dvh - 146px) * 1.58));
+    aspect-ratio:1.58;border-radius:50% / 46%;
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(255,255,255,.10), rgba(255,255,255,0) 58%),
+      radial-gradient(ellipse at 50% 50%, #17614f 0%, #0e4237 42%, #06211c 100%);
+    box-shadow:
+      inset 0 0 0 9px #10241e,
+      inset 0 0 0 11px rgba(232,200,121,.30),
+      inset 0 0 90px rgba(0,0,0,.6),
+      0 30px 70px -26px #000;
+  }
+  .table::after{content:"";position:absolute;inset:16%;border-radius:50%;
+    border:1px dashed rgba(232,200,121,.12);pointer-events:none}
+
+  /* ---------- 座位 ---------- */
+  #seats{position:absolute;inset:0}
+  .seat{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;
+    align-items:center;gap:4px;z-index:3;width:168px}
+  .s0{left:50%;bottom:2.2%}
+  .s1{left:19%;bottom:6%}
+  .s2{left:9%;top:31%}
+  .s3{left:50%;top:2.4%}
+  .s4{left:91%;top:31%}
+  .s5{left:81%;bottom:6%}
+  .s2, .s3, .s4{flex-direction:column-reverse}
+  /* 双人场：对手坐得离桌面近一点，牌也大一号 */
+  .table[data-seats="2"] .s3{top:7%;--cw:clamp(36px,4.2vw,50px)}
+  .table[data-seats="4"] .s2, .table[data-seats="4"] .s4{top:27%}
+
+  .who{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 5px;border-radius:999px;
+    background:rgba(4,14,12,.6);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(4px);
+    max-width:100%}
+  .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:0 0 auto;
+    background:linear-gradient(160deg,#20463c,#0d2a24);border:1px solid rgba(232,200,121,.28)}
+  .who b{display:block;font-size:13px;letter-spacing:.04em;font-weight:600;line-height:1.25;white-space:nowrap}
+  .who i{display:block;font-style:normal;font-size:12.5px;color:#e2f0e8;letter-spacing:.02em;font-weight:700;
+    font-variant-numeric:tabular-nums;line-height:1.2}
+  .seat.active .who{border-color:rgba(232,200,121,.85);animation:seatPulse 1.15s ease-in-out infinite}
+  .s0.active .who{border-color:rgba(120,240,220,.85);animation:seatPulseMine 1.15s ease-in-out infinite}
+  @keyframes seatPulse{
+    0%,100%{box-shadow:0 0 14px -6px rgba(232,200,121,.45)}
+    50%{box-shadow:0 0 26px -2px rgba(232,200,121,.95)}}
+  @keyframes seatPulseMine{
+    0%,100%{box-shadow:0 0 14px -6px rgba(120,240,220,.45)}
+    50%{box-shadow:0 0 26px -2px rgba(120,240,220,.95)}}
+  .seat.folded{opacity:.36;filter:grayscale(.8)}
+  .seat.folded .hand{animation:muckOut .38s ease-in forwards}
+  .seat.revealed{opacity:1 !important;filter:none !important}
+  .seat.revealed .hand{opacity:1 !important;animation:none !important}
+  .seat.revealed .who{background:rgba(4,14,12,.72)}
+  @keyframes muckOut{to{opacity:0;transform:translateY(16px) rotate(7deg) scale(.86)}}
+  .seat.out{opacity:.2}
+  .seat.winner .who{border-color:#8ff0c4;box-shadow:0 0 24px -4px rgba(120,240,190,.7)}
+
+  .hand{display:flex;gap:4px;height:calc(var(--cw) * 1.42);opacity:0;transition:opacity .2s}
+  .seat.dealt .hand{opacity:1}
+  .s0 .hand{--cw:var(--cwy);height:calc(var(--cwy) * 1.42)}
+  .slot{perspective:800px;animation:dealIn .32s cubic-bezier(.2,.9,.3,1.25) both}
+  @keyframes dealIn{from{opacity:0;transform:translateY(-14px) scale(.86)}to{opacity:1;transform:none}}
+  .card{position:relative;width:var(--cw);height:calc(var(--cw) * 1.42);
+    transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,.1,.3,1)}
+  .card.up{transform:rotateY(180deg)}
+  .s0 .card{width:var(--cwy);height:calc(var(--cwy) * 1.42)}
+  .face{position:absolute;inset:0;border-radius:6px;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    box-shadow:0 3px 8px -4px rgba(0,0,0,.85), 0 0 0 1px rgba(0,0,0,.25)}
+  .face.back{background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.045) 0 5px, transparent 5px 10px),
+      linear-gradient(150deg,#1b4a6d,#0d293f 60%,#0a1f31);
+    border:1px solid rgba(255,255,255,.12)}
+  .face.front{transform:rotateY(180deg);background:linear-gradient(158deg,#fff,#e6ece7);
+    color:#10201a;display:flex;flex-direction:column;justify-content:space-between;
+    padding:3px 4px;font-weight:800;line-height:1;border:1px solid rgba(0,0,0,.14)}
+  .face.front.red{color:#c22f4a}
+  .rk{font-size:calc(var(--cw) * .42);letter-spacing:-.03em}
+  .su{font-size:calc(var(--cw) * .4);align-self:flex-end}
+  .s0 .rk{font-size:calc(var(--cwy) * .42)}
+  .s0 .su{font-size:calc(var(--cwy) * .4)}
+  .bigpip{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cw) * .78);opacity:.11;pointer-events:none}
+
+  .tag{height:14px;font-size:10px;letter-spacing:.06em;color:#ffe0a8;
+    background:rgba(232,200,121,.13);border:1px solid rgba(232,200,121,.3);border-radius:999px;
+    padding:0 8px;line-height:12px;opacity:0;transition:opacity .2s;white-space:nowrap}
+  .tag.on{opacity:1}
+  .tag.fold{color:#ffb3c0;background:rgba(255,90,110,.08);border-color:rgba(255,90,110,.2)}
+
+  .dealer{position:absolute;width:17px;height:17px;border-radius:50%;display:grid;place-items:center;
+    font-size:9px;font-weight:800;color:#3a2c07;background:linear-gradient(160deg,#f4dd9c,#c8a34e);
+    box-shadow:0 2px 7px -2px #000;opacity:0;transition:.2s;z-index:5}
+  .dealer.on{opacity:1}
+  .s0 .dealer{right:-6px;bottom:16px}
+  .s1 .dealer{right:-4px;bottom:18px}
+  .s2 .dealer{right:-4px;bottom:10px}
+  .s3 .dealer{right:-6px;bottom:10px}
+  .s4 .dealer{right:-4px;bottom:10px}
+  .s5 .dealer{right:-4px;bottom:18px}
+
+  /* ---------- 桌面中央 ---------- */
+  .pot{position:absolute;left:50%;top:34.5%;transform:translate(-50%,-50%);z-index:2;
+    display:inline-flex;align-items:center;gap:7px;padding:4px 14px;border-radius:999px;
+    background:rgba(3,12,10,.55);border:1px solid rgba(232,200,121,.22);font-size:11.5px;
+    letter-spacing:.12em;color:#c9dcd3;white-space:nowrap}
+  .pot b{color:var(--gold);font-size:14px;font-variant-numeric:tabular-nums}
+  .board{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);z-index:2;
+    display:flex;gap:6px;height:calc(var(--cwb) * 1.42);--cw:var(--cwb)}
+  .board .card{width:var(--cwb);height:calc(var(--cwb) * 1.42)}
+  .stage-lab{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);z-index:2;
+    font-size:10px;letter-spacing:.28em;color:rgba(200,225,214,.42);text-transform:uppercase;white-space:nowrap}
+
+  .lives{display:flex;flex-direction:column;gap:6px}
+  .lrow{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:baseline;
+    padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.02);
+    border:1px solid rgba(255,255,255,.05);font-size:11px;color:#8aa79b}
+  .lrow b{color:#e8c879;letter-spacing:.08em;font-size:11px}
+  .lrow i{font-style:normal;color:#c9ded3}
+  .lrow span{text-align:right;color:#7f9c92;font-variant-numeric:tabular-nums}
+  .ovboard{margin-top:9px;font-size:10.5px;letter-spacing:.14em;color:#c9a86a;
+    cursor:pointer;transition:.15s}
+  .ovboard:hover{color:#f2dfa8}
+  .ovlife{margin-left:9px;padding:2px 8px;border-radius:20px;font-size:9.5px;letter-spacing:.12em;
+    color:#e8c879;background:rgba(232,200,121,.1);border:1px solid rgba(232,200,121,.3)}
+  .ovlife.hide{display:none}
+  .ccard{display:flex;gap:10px;padding:12px;border-radius:12px;margin-bottom:8px;
+    background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.06)}
+  .cav{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:19px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);flex:0 0 auto}
+  .cin{flex:1;min-width:0}
+  .cin b{font-size:13px;color:#e8f3ec;letter-spacing:.04em}
+  .ctag{margin-left:6px;font-size:9.5px;letter-spacing:.1em;color:#e8c879;
+    background:rgba(232,200,121,.1);border:1px solid rgba(232,200,121,.24);padding:1px 6px;border-radius:20px}
+  .cw{font-size:11px;color:#9db4a9;margin:4px 0 3px}
+  .cin p{margin:0;font-size:11px;line-height:1.65;color:#8aa79b}
+  .crel{font-size:10px;color:#6f8d82;margin-top:5px;letter-spacing:.04em}
+  .backbtn{display:inline-block;margin:0 0 10px;padding:6px 13px;border-radius:8px;font-size:11px;
+    letter-spacing:.08em;border:1px solid rgba(255,255,255,.14);color:#b9cec4;background:rgba(255,255,255,.04)}
+  .backbtn:hover{color:#f2dfa8;border-color:rgba(232,200,121,.45)}
+  .lbr.live{cursor:pointer}
+  .lbr.live:hover{background:rgba(232,200,121,.07)}
+  .cdetail{display:flex;gap:12px;align-items:center;margin:12px 0 12px}
+  .cdetail b{font-size:17px;color:#eaf6ef}
+  .cbg{font-size:11.5px;line-height:1.8;color:#8aa79b;margin:0 0 12px}
+  .cgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+  .cgrid div{padding:9px;border-radius:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+  .cgrid i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.14em;color:#7f9c92;margin-bottom:4px}
+  .cgrid b{font-size:13px;color:#e8f3ec}
+  .cquote{font-size:11px;line-height:1.8;color:#c9a86a;margin-bottom:12px}
+  .wline{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:10.5px;color:#7f9c92}
+  .risk{letter-spacing:.06em}
+  .risk.safe{color:#6f9c84}
+  .risk.warn{color:#e7b95a}
+  .risk.danger{color:#ff8fa0}
+  .wrisk{margin-top:6px;font-size:10.5px;color:#ff8fa0;line-height:1.6}
+  .rumors{display:flex;flex-direction:column;gap:5px}
+  .rmt{display:inline-block;margin-right:7px;font-size:9.5px;color:#5f7a6f;letter-spacing:.06em}
+  .rm{font-size:11px;line-height:1.7;color:#8aa79b;padding:7px 10px;border-radius:8px;
+    background:rgba(255,255,255,.02);border-left:2px solid rgba(232,200,121,.3)}
+  .lb{display:flex;flex-direction:column;gap:2px}
+  .lbr{display:grid;grid-template-columns:26px 1fr auto auto;gap:8px;align-items:center;
+    padding:6px 9px;border-radius:7px;font-size:11px;color:#8aa79b}
+  .lbr:nth-child(odd){background:rgba(255,255,255,.02)}
+  .lbr i{font-style:normal;color:#6f8d82;font-variant-numeric:tabular-nums}
+  .lbr b{color:#d5e8de;font-weight:600;font-size:11.5px}
+  .lbr span{font-size:9.5px;color:#6f8d82}
+  .lbr em{font-style:normal;color:#c9ded3;font-variant-numeric:tabular-nums}
+  .lbr.you{background:rgba(232,200,121,.09);border:1px solid rgba(232,200,121,.25)}
+  .lbr.you b,.lbr.you em{color:#f2dfa8}
+  .say{position:absolute;left:50%;bottom:calc(100% + 5px);transform:translate(-50%,6px);
+    max-width:210px;padding:6px 10px;border-radius:10px;font-size:11px;line-height:1.5;
+    background:rgba(8,20,16,.95);border:1px solid rgba(232,200,121,.3);color:#e8f3ec;
+    opacity:0;pointer-events:none;transition:.25s;z-index:7;text-align:center}
+  .say.on{opacity:1;transform:translate(-50%,0)}
+  .seat.s3 .say{bottom:auto;top:calc(100% + 5px)}
+  .life{margin-left:10px;padding:2px 9px;border-radius:20px;font-size:10px;letter-spacing:.14em;
+    color:#e8c879;background:rgba(232,200,121,.1);border:1px solid rgba(232,200,121,.28)}
+  .brokeline{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:12px;color:#8aa79b}
+  .brokeline.hide{display:none}
+  .brokeline button{border-color:rgba(232,200,121,.4);color:#f0d99a}
+  #rebirth{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 40%,rgba(10,26,22,.96),rgba(2,6,5,.99));
+    backdrop-filter:blur(6px);animation:rbIn .5s ease}
+  #rebirth.on{display:flex}
+  @keyframes rbIn{from{opacity:0}to{opacity:1}}
+  .rbbox{width:min(460px,92vw);padding:34px 30px 26px;text-align:center;border-radius:18px;
+    background:linear-gradient(180deg,rgba(14,30,25,.95),rgba(8,18,15,.98));
+    border:1px solid rgba(232,200,121,.18);box-shadow:0 30px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)}
+  .rblife{font-size:10px;letter-spacing:.5em;color:#7f9c92;margin-bottom:12px}
+  .rbtitle{font-size:38px;font-weight:800;letter-spacing:.06em;margin:0 0 14px;
+    background:linear-gradient(180deg,#fbeec2,#d8a94e);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .rbline{font-size:12.5px;line-height:1.9;color:#9db4a9;margin:0 0 22px;min-height:44px}
+  .rbstats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+  .rbstats div{padding:12px 8px;border-radius:10px;background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.06)}
+  .rbstats i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.16em;color:#7f9c92;margin-bottom:5px}
+  .rbstats b{font-size:17px;font-weight:700;color:#eaf6ef;font-variant-numeric:tabular-nums}
+  .rbdeath{display:block;margin-top:10px;color:#e79a5a;font-size:11.5px;line-height:1.8}
+  .rbwarn{font-size:10.5px;line-height:1.8;color:#6f8d82;margin:0 0 20px}
+  .rbhold{position:relative;width:100%;height:52px;border-radius:12px;overflow:hidden;cursor:pointer;
+    border:1px solid rgba(232,200,121,.42);background:rgba(232,200,121,.06);color:#f2dfa8;
+    font-family:inherit;font-size:13px;letter-spacing:.2em;user-select:none;touch-action:none}
+  .rbfill{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,#8a6a22,#e8c879);
+    opacity:.55;transition:width .05s linear}
+  .rbtxt{position:relative;z-index:1}
+  .rbno{margin-top:12px;background:none;border:none;color:#6f8d82;font-size:11px;letter-spacing:.2em;
+    cursor:pointer;font-family:inherit}
+  .rbno:hover{color:#9db4a9}
+  .rbfade{animation:rbOut .6s ease forwards}
+  @keyframes rbOut{to{opacity:0;transform:scale(1.04)}}
+  .eqchip{position:absolute;left:3.4%;top:5.2%;z-index:4;padding:6px 11px 8px;border-radius:11px;
+    background:rgba(4,14,12,.5);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(4px);
+    min-width:92px;transition:opacity .2s}
+  .eqchip.hide{opacity:0}
+  .eqchip .lb{font-size:9px;letter-spacing:.2em;color:#7f9c92}
+  .eqchip .vv{font-size:15px;font-weight:700;color:#d8ece3;font-variant-numeric:tabular-nums;margin-top:1px}
+  .eqchip .bb{height:3px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:5px;overflow:hidden}
+  .eqchip .bb i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#2fc48c,#9df0c8);transition:width .3s}
+
+  .toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.93);
+    padding:13px 28px;border-radius:15px;background:rgba(4,16,13,.9);
+    border:1px solid rgba(232,200,121,.35);box-shadow:0 20px 50px -18px #000;
+    font-size:17px;font-weight:700;letter-spacing:.07em;opacity:0;pointer-events:none;
+    transition:opacity .25s, transform .25s;z-index:9;text-align:center;line-height:1.55}
+  .toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .toast small{display:block;font-size:11px;font-weight:500;letter-spacing:.14em;color:#9db8ac;margin-top:3px}
+  .toast.good{border-color:rgba(120,240,190,.5);color:#c8ffe6}
+  .toast.bad{border-color:rgba(255,120,140,.45);color:#ffd0d8}
+
+  /* ---------- 侧栏 ---------- */
+  .side{display:flex;flex-direction:column;gap:9px;min-height:0;padding-top:4px;overflow:hidden;
+    transition:opacity .22s ease, transform .3s ease}
+  #app.side-closed .side{opacity:0;transform:translateX(16px);pointer-events:none}
+  .side .panel{min-width:260px}
+  .sidehead{display:flex;justify-content:space-between;align-items:center;padding:0 2px 2px;
+    font-size:9.5px;letter-spacing:.22em;color:#6f8d82}
+  .sidetab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:45;display:none;
+    align-items:center;justify-content:center;padding:16px 7px;border-radius:10px 0 0 10px;
+    background:rgba(10,20,17,.94);border:1px solid rgba(255,255,255,.12);border-right:none;
+    color:#b9cec4;font-size:11px;letter-spacing:.18em;cursor:pointer;writing-mode:vertical-rl;
+    font-family:inherit;transition:.15s}
+  .sidetab:hover{color:var(--gold);border-color:rgba(232,200,121,.5)}
+  #app.side-closed .sidetab{display:flex}
+  .panel{background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:9px 11px}
+  .panel h4{margin:0 0 7px;font-size:9.5px;letter-spacing:.22em;color:#6f8d82;font-weight:600;text-transform:uppercase}
+  .read{font-size:11px;line-height:1.75;color:#b9cec4}
+  .read b{color:var(--gold);font-weight:600}
+  .log{flex:1;min-height:0;overflow-y:auto;font-size:11.5px;line-height:1.6;padding:2px;
+    scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+  .log::-webkit-scrollbar{width:5px}
+  .log::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+  .line{color:#9db4a9;padding:1px 0;animation:fade .2s}
+  .line.you{color:#cfe6ff}
+  .line.bot{color:#ffd9a8}
+  .line.sep{color:#5f7a6f;font-size:10px;letter-spacing:.16em;text-align:center;margin:5px 0 3px;
+    border-top:1px solid rgba(255,255,255,.06);padding-top:5px}
+  .line.hl{color:var(--gold)}
+  @keyframes fade{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
+
+  .eqwrap{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+  .eqbar{height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,#2fc48c,#9df0c8);
+    transition:width .35s ease, background .35s ease}
+  .eqtxt{font-size:11px;color:#8fa89d;margin-top:6px;letter-spacing:.04em}
+  .eqtxt b{color:#d8ece3;font-size:12.5px}
+
+  /* 钱包 */
+  .cashline{display:flex;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap}
+  .cashbig{font-size:21px;font-weight:700;color:#f4ecd6;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .lvltag{font-size:9.5px;letter-spacing:.1em;color:#c8a34e;border:1px solid rgba(232,200,121,.35);
+    border-radius:999px;padding:1px 7px;white-space:nowrap}
+  .debtline{font-size:10.5px;color:#7f9c92;margin-top:3px;letter-spacing:.02em}
+  .debtline.warn{color:#ff9db0}
+  .linkbtn{background:none;border:none;color:#6f8d82;font-size:9.5px;letter-spacing:.12em;
+    cursor:pointer;padding:0;transition:.15s}
+  .linkbtn:hover{color:var(--gold)}
+
+  /* 牌桌选择 */
+  .tables{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:680px;width:100%}
+  @media (max-width:620px){ .tables{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .tchip{padding:8px 5px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.04);cursor:pointer;transition:.15s;text-align:center;font-family:inherit}
+  .tchip b{display:block;font-size:12.5px;color:#d8e6de;letter-spacing:.06em}
+  .tchip i{display:block;font-style:normal;font-size:9.5px;color:#7f9c92;margin-top:2px;white-space:nowrap}
+  .tchip em{display:block;font-style:normal;font-size:9px;color:#c98f9c;margin-top:2px;white-space:nowrap}
+  .tchip:hover:not(.locked){border-color:rgba(232,200,121,.5)}
+  .tchip.on{border-color:rgba(232,200,121,.75);
+    background:linear-gradient(180deg,rgba(232,200,121,.22),rgba(232,200,121,.07));
+    box-shadow:0 0 18px -7px rgba(232,200,121,.7)}
+  .tchip.on b{color:#fff3d6}
+  .tchip.locked{opacity:.42;cursor:not-allowed;background:rgba(255,255,255,.02)}
+
+  /* 钱包抽屉 */
+  .wcard{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-radius:12px;
+    padding:11px 13px;margin-bottom:9px}
+  .wcard .wt{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+  .wcard .wt b{font-size:12px;letter-spacing:.06em;color:#dfeae3}
+  .wcard .wt span{font-size:9.5px;color:#7f9c92;letter-spacing:.04em}
+  .wamt{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#f0e6c8}
+  .wamt.red{color:#ff9db0}
+  .wbtns{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .wbtns button{flex:1 1 0;min-width:60px;padding:6px 4px;border-radius:8px;font-size:11px;cursor:pointer;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#b9cec4;
+    transition:.15s;font-family:inherit}
+  .wbtns button:hover:not(:disabled){border-color:rgba(232,200,121,.5);color:#ffe9b8}
+  .wbtns button:disabled{opacity:.32;cursor:not-allowed}
+  .wbtns button.danger{color:#ffb3c0;border-color:rgba(255,90,110,.3);flex:1 1 100%}
+  .wbtns button.danger:hover{border-color:rgba(255,90,110,.6);color:#ffd0d8}
+  .txrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 2px;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:11.5px}
+  .txrow .tl{color:#b9cec4;min-width:0}
+  .txrow .tl i{display:block;font-style:normal;font-size:9.5px;color:#6f8d82;margin-top:2px}
+  .txrow .ta{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;text-align:right}
+  .txrow .ta.up{color:#7fe3b4}
+  .txrow .ta.down{color:#ff9db0}
+  .txrow .ta.even{color:#9db4a9}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .statgrid div{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;padding:9px 11px}
+  .statgrid i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.14em;color:#6f8d82}
+  .statgrid b{display:block;font-size:15px;margin-top:3px;color:#e6f2ec;font-variant-numeric:tabular-nums}
+  .statgrid b.up{color:#7fe3b4}
+  .statgrid b.down{color:#ff9db0}
+  .sech{margin:8px 0 4px;font-size:9.5px;letter-spacing:.2em;color:#6f8d82;font-weight:600}
+  .ovrank{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:999px;
+    background:rgba(232,200,121,.09);border:1px solid rgba(232,200,121,.28);margin-top:2px}
+  .ovrank b{font-size:12.5px;letter-spacing:.1em;color:#f6ecd2}
+  .ovrank i{font-style:normal;font-size:11px;color:#a89566}
+
+  /* 成就 */
+  .achs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .ach{padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.06);opacity:.45}
+  .ach.got{opacity:1;background:rgba(232,200,121,.08);border-color:rgba(232,200,121,.3)}
+  .ach b{display:block;font-size:11px;color:#cfe0d7;font-weight:600}
+  .ach.got b{color:#f6e3ae}
+  .ach i{display:block;font-style:normal;font-size:9px;color:#7f9c92;margin-top:2px;line-height:1.4}
+
+  /* 事件弹窗 */
+  #event{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%, rgba(46,10,16,.78), rgba(4,3,5,.96));
+    backdrop-filter:blur(7px);padding:24px;transition:opacity .25s}
+  #event.hide{opacity:0;pointer-events:none}
+  .evbox{max-width:440px;width:100%;background:linear-gradient(165deg,#1a0f12,#0b0709);
+    border:1px solid rgba(255,90,110,.32);border-radius:16px;padding:20px 22px;
+    box-shadow:0 30px 80px -30px #000, inset 0 0 50px rgba(255,60,90,.07)}
+  .evwho{font-size:9.5px;letter-spacing:.3em;color:#c98f9c;text-transform:uppercase}
+  .evbox h3{margin:6px 0 8px;font-size:20px;letter-spacing:.08em;color:#ffd9de;font-weight:700}
+  .evbox p{margin:0 0 15px;font-size:12.5px;line-height:1.95;color:#c9b3b7}
+  .evbtns{display:flex;flex-direction:column;gap:8px}
+  .evbtns button{text-align:left;padding:11px 14px;border-radius:10px;cursor:pointer;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#e6d9db;
+    font-size:13px;font-family:inherit;transition:.15s;letter-spacing:.02em}
+  .evbtns button:hover:not(:disabled){border-color:rgba(255,120,140,.55);background:rgba(255,90,110,.1)}
+  .evbtns button:disabled{opacity:.35;cursor:not-allowed}
+  .evbtns button small{display:block;font-size:10.5px;color:#93807f;margin-top:3px;letter-spacing:0}
+
+  /* ---------- 操作条 ---------- */
+  .actionbar{position:relative;flex:0 0 auto;padding:6px 16px 11px;display:flex;flex-direction:column;gap:7px;
+    border-top:1px solid rgba(255,255,255,.05);background:linear-gradient(180deg,rgba(10,20,17,0),#070c0a 40%)}
+  .betctrl{display:flex;align-items:center;gap:12px;justify-content:center;width:100%;
+    opacity:0;pointer-events:none;transition:opacity .18s;height:28px}
+  .betctrl.on{opacity:1;pointer-events:auto}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:min(300px,38vw);height:4px;border-radius:2px;
+    background:linear-gradient(90deg,rgba(232,200,121,.6),rgba(232,200,121,.15));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff3cf,#d8b35f);border:1px solid #8d6f2a;cursor:pointer;
+    box-shadow:0 0 12px rgba(232,200,121,.6)}
+  .amt{font-size:11.5px;color:#a8c1b6;letter-spacing:.05em;min-width:112px;text-align:right}
+  .amt b{color:var(--gold);font-size:14px;font-variant-numeric:tabular-nums}
+  .presets{display:flex;gap:5px}
+  .presets button{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#a9c2b7;
+    font-size:10.5px;padding:3px 8px;border-radius:6px;cursor:pointer;transition:.14s}
+  .presets button:hover{background:rgba(232,200,121,.14);color:#ffe9b8;border-color:rgba(232,200,121,.4)}
+  .btns{display:flex;gap:9px;justify-content:center;width:100%}
+  .btn{flex:0 1 168px;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:700;
+    letter-spacing:.08em;cursor:pointer;transition:.16s;border:1px solid transparent;
+    font-variant-numeric:tabular-nums}
+  .btn:disabled{opacity:.32;cursor:not-allowed}
+  .btn.fold{background:rgba(255,90,110,.1);border-color:rgba(255,90,110,.35);color:#ffb3c0}
+  .btn.fold:hover:not(:disabled){background:rgba(255,90,110,.2)}
+  .btn.call{background:rgba(120,180,255,.11);border-color:rgba(120,180,255,.34);color:#bcd8ff}
+  .btn.call:hover:not(:disabled){background:rgba(120,180,255,.2)}
+  .btn.raise{background:linear-gradient(180deg,rgba(232,200,121,.24),rgba(200,160,70,.14));
+    border-color:rgba(232,200,121,.55);color:#ffeec6}
+  .btn.raise:hover:not(:disabled){background:linear-gradient(180deg,rgba(232,200,121,.36),rgba(200,160,70,.22));
+    box-shadow:0 0 24px -6px rgba(232,200,121,.7)}
+  .actionbar.idle .btn{opacity:.3;pointer-events:none}
+  .actionbar.idle .betctrl{opacity:0;pointer-events:none}
+  .clockbar{position:absolute;left:0;right:0;top:0;height:3px;background:rgba(255,255,255,.05);
+    opacity:0;transition:opacity .25s;overflow:hidden;pointer-events:none}
+  .clockbar.on{opacity:1}
+  .clockbar i{position:relative;display:block;height:100%;width:100%;
+    background:linear-gradient(90deg,#e8c879,#f6e3ae);transition:width .12s linear, background .3s}
+  .clockbar i::after{content:'';position:absolute;right:0;top:-2px;bottom:-2px;width:5px;background:#fff;
+    border-radius:2px;box-shadow:0 0 8px rgba(255,255,255,.9);animation:beat 1s ease-out infinite}
+  @keyframes beat{0%{opacity:1;transform:scaleY(1.2)}45%{opacity:.12}100%{opacity:.12}}
+  .clockbar.warn i{background:linear-gradient(90deg,#e79a5a,#ffcf8a)}
+  .clockbar.warn i::after{box-shadow:0 0 10px rgba(255,200,120,.95)}
+  .clockbar.danger i{background:linear-gradient(90deg,#ff4a60,#ff9fb0)}
+  .clockbar.danger i::after{box-shadow:0 0 14px rgba(255,90,110,1)}
+  .hint.danger{color:#ff9db0;animation:dangerBlink .9s steps(2) infinite}
+  @keyframes dangerBlink{50%{opacity:.45}}
+  .hint{font-size:11px;color:#5f7a6f;letter-spacing:.12em;height:15px;text-align:center;
+    display:flex;align-items:center;justify-content:center;gap:6px;transition:color .2s}
+  .hint:empty{visibility:hidden}
+  .hint.bot{color:var(--gold);font-size:12.5px;letter-spacing:.1em}
+  .hint.mine{color:#7fe3d0;font-size:12.5px;letter-spacing:.1em}
+  .hint.bot::before,.hint.mine::before{content:'';width:6px;height:6px;border-radius:50%;
+    background:currentColor;animation:dotPulse 1s ease-in-out infinite}
+  @keyframes dotPulse{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
+
+  /* 每手之间的暂停面板（牌桌中央） */
+  .contbar{position:fixed;left:50%;top:47%;transform:translate(-50%,-50%) scale(.94);z-index:40;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:22px 36px 18px;border-radius:20px;min-width:340px;
+    background:rgba(8,16,13,.96);border:1px solid rgba(232,200,121,.35);
+    box-shadow:0 34px 90px -34px #000, inset 0 0 70px rgba(232,200,121,.05);
+    backdrop-filter:blur(10px);
+    opacity:0;pointer-events:none;transition:.24s}
+  .contbar.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+  .cbhand{font-size:10.5px;letter-spacing:.3em;color:#7f9c92;text-transform:uppercase}
+  .cbamt{font-size:48px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;
+    letter-spacing:.01em;text-shadow:0 0 34px currentColor}
+  .cbamt.up{color:#7fe3b4}
+  .cbamt.down{color:#ff9db0}
+  .cbamt.even{color:#cfe0d7}
+  .cbmeta{font-size:11.5px;color:#8fa89d;letter-spacing:.03em;margin-bottom:6px}
+  .cbbtns{display:flex;gap:10px;justify-content:center}
+  .cbbtns button{padding:11px 26px;border-radius:9px;font-size:13.5px;cursor:pointer;
+    font-family:inherit;font-weight:600;letter-spacing:.06em;transition:.16s;
+    background:linear-gradient(180deg,rgba(232,200,121,.26),rgba(200,160,70,.15));
+    border:1px solid rgba(232,200,121,.6);color:#ffeec6}
+  .cbbtns button:hover{background:linear-gradient(180deg,rgba(232,200,121,.4),rgba(200,160,70,.24));
+    box-shadow:0 0 22px -8px rgba(232,200,121,.9)}
+  .cbbtns button.ghost{background:transparent;border-color:rgba(255,255,255,.18);color:#b9cec4;
+    font-weight:400}
+  .cbbtns button.ghost:hover{background:rgba(255,255,255,.05);color:#e6f2ec;box-shadow:none}
+  .cbmin{position:absolute;top:7px;right:9px;background:none;border:none;color:#6f8d82;
+    font-size:10px;letter-spacing:.1em;cursor:pointer;padding:4px 6px;transition:.15s;font-family:inherit}
+  .cbmin:hover{color:var(--gold)}
+  .contbar.min{top:auto;bottom:104px;transform:translate(-50%,0);flex-direction:row;
+    align-items:center;gap:12px;padding:8px 16px;min-width:0;border-radius:12px}
+  .contbar.min .cbhand{display:none}
+  .contbar.min .cbamt{font-size:18px;text-shadow:none}
+  .contbar.min .cbmeta{display:none;margin:0}
+  .contbar.min .cbbtns button{padding:7px 14px;font-size:11.5px}
+  .contbar.min .cbmin{position:static;order:-1;padding:4px 8px;font-size:11px}
+
+  /* ---------- 复盘抽屉 ---------- */
+  .drawer-wrap{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0;transition:.22s}
+  .drawer-wrap.on{pointer-events:auto;opacity:1}
+  .drawer-wrap .backdrop{position:absolute;inset:0;background:rgba(3,7,6,.5)}
+  .drawer-wrap .drawer{position:absolute;top:0;right:0;bottom:0;width:min(420px,100%);
+    background:#0a1310;border-left:1px solid rgba(255,255,255,.08);
+    display:flex;flex-direction:column;transform:translateX(20px);transition:.24s}
+  .drawer-wrap.on .drawer{transform:none}
+  .rhead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;
+    border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;letter-spacing:.2em;color:#8fa89d}
+  .rbody{flex:1;overflow-y:auto;padding:10px}
+  .ritem{border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:8px;overflow:hidden}
+  .rsum{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;cursor:pointer;
+    font-size:12px;align-items:center}
+  .rsum:hover{background:rgba(255,255,255,.03)}
+  .rigtag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;
+    font-size:9px;letter-spacing:.08em;color:#e8c879;background:rgba(232,200,121,.12);
+    border:1px solid rgba(232,200,121,.3);vertical-align:middle}
+  .rsum .res{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .res.up{color:#7fe3b4}.res.down{color:#ff9db0}.res.even{color:#9db4a9}
+  .rdetail{display:none;padding:2px 12px 12px;font-size:11.5px;line-height:1.8;color:#9db4a9;
+    border-top:1px dashed rgba(255,255,255,.07)}
+  .ritem.open .rdetail{display:block}
+  .rdetail i{color:#6f8d82;font-style:normal;letter-spacing:.16em;font-size:10px;display:block;margin-top:7px}
+  .rdetail i.inl{display:inline;margin:0 2px}
+  .rdetail .me{color:#cfe6ff}.rdetail .op{color:#ffd9a8}
+  .rcard{font-weight:700}
+  .rcard.red{color:#ff8fa3}
+  .rcard.blk{color:#dbe8e2}
+  #infoBody .log{max-height:46vh;min-height:180px;overflow-y:auto}
+  .empty{color:#6f8d82;font-size:12px;text-align:center;margin-top:40px;letter-spacing:.1em}
+
+  /* ---------- 开始界面 ---------- */
+  #overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:9px;text-align:center;padding:20px;overflow-y:auto;
+    background:radial-gradient(circle at 50% 40%, rgba(10,30,24,.72), rgba(3,6,8,.95));
+    backdrop-filter:blur(9px);transition:opacity .3s}
+  #overlay.hide{opacity:0;pointer-events:none}
+  #overlay h1{margin:0;font-size:clamp(24px,4.2vw,40px);letter-spacing:.1em;font-weight:800;
+    background:linear-gradient(100deg,#d9f5e7,#e8c879 55%,#9fd8c0);-webkit-background-clip:text;
+    background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(232,200,121,.26))}
+  #overlay p{margin:0;font-size:12px;letter-spacing:.2em;color:#8aa79b;line-height:1.9}
+  #overlay p.small{letter-spacing:.05em;font-size:12px;color:#6d8a7f;line-height:1.85;max-width:560px}
+  #overlay #ovBtn{margin:0;padding:12px 42px;border-radius:999px;cursor:pointer;font-size:14px;
+    font-weight:700;letter-spacing:.14em;color:#16210d;
+    background:linear-gradient(160deg,#f6e3ae,#d9b45f);border:1px solid #f7ecc8;
+    box-shadow:0 12px 34px -12px rgba(232,200,121,.9);transition:.18s}
+  #overlay #ovBtn:hover{transform:translateY(-1px)}
+
+  .fan{position:relative;width:250px;height:112px;margin:0 auto 2px;flex:0 0 auto}
+  .fcWrap{position:absolute;left:50%;top:50%;width:68px;height:97px}
+  .fc{width:100%;height:100%;border-radius:8px;background:linear-gradient(158deg,#fff,#e6ece7);
+    color:#12211b;box-shadow:0 14px 26px -12px rgba(0,0,0,.95),0 0 0 1px rgba(0,0,0,.25);
+    padding:6px 7px;font-weight:800;animation:dealUp .55s cubic-bezier(.2,.9,.3,1.25) both}
+  .fc.red{color:#c22f4a}
+  .fr{font-size:19px;line-height:1;display:block}
+  .fs{font-size:17px;line-height:1;display:block;margin-top:2px}
+  .fp{position:absolute;left:8px;bottom:7px;font-size:18px;line-height:1;opacity:.5}
+  @keyframes dealUp{from{opacity:0;transform:translateY(-34px) scale(.85)}to{opacity:1;transform:none}}
+
+  .modes button.lock{opacity:.4;cursor:not-allowed;border-color:rgba(255,255,255,.08);font-size:10.5px}
+  .modes button.lock:hover{transform:none;border-color:rgba(255,255,255,.08)}
+  .modes{display:flex;gap:8px;margin-top:4px}
+  .modes button{padding:9px 20px;border-radius:10px;font-size:12.5px;font-weight:600;letter-spacing:.08em;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#a9c2b7;
+    cursor:pointer;transition:.16s}
+  .modes button:hover{border-color:rgba(232,200,121,.5);color:#ffe9b8}
+  .modes button.on{background:linear-gradient(180deg,rgba(232,200,121,.28),rgba(200,160,70,.15));
+    border-color:rgba(232,200,121,.75);color:#fff3d6;box-shadow:0 0 20px -7px rgba(232,200,121,.7)}
+  .ovSetup{display:flex;gap:18px;margin-top:2px;font-size:11px;color:#7f9c92;letter-spacing:.06em}
+  .ovSetup label{display:flex;align-items:center;gap:7px}
+  .ovBtns{display:flex;align-items:center;gap:11px;margin-top:6px}
+  .ovBtns .ghost{padding:11px 18px;border-radius:999px;font-size:12.5px}
+  .tips{font-size:10.5px;color:#5f7a6f;letter-spacing:.08em;margin-top:6px}
+
+  @media (max-width:1000px){
+    .layout{grid-template-columns:1fr;padding:0 8px 2px;gap:0}
+    .side{display:none}
+    .table{max-width:100%}
+    .seat{width:104px}
+    .who b{font-size:10px}.who i{font-size:9px}.av{width:20px;height:20px;font-size:11px}
+    .btn{flex:1 1 0;padding:11px 6px;font-size:13px}
+    .presets{display:none}
+    .info{display:none}
+  }
+  html,body{max-width:100%;overflow-x:hidden}
+  @media (max-width:700px){
+    :root{--cw:clamp(24px,6.4vw,34px);--cwy:clamp(26px,7.4vw,40px);--cwb:clamp(28px,8vw,42px)}
+    .topbar{padding:6px 10px 4px;gap:8px}
+    .brand{font-size:12px}
+    .brand span{display:none}
+    .info{gap:8px;font-size:10.5px}
+    #btnReview{display:none}
+    .life{font-size:9px;padding:1px 7px;margin-left:6px}
+    .topbar .ghost{padding:6px 9px;font-size:10.5px}
+    .seat{width:96px}
+    .seat .who{padding:2px 8px 2px 3px;gap:5px}
+    .seat .av{width:20px;height:20px;font-size:11px}
+    .who b{font-size:9.5px}
+    .who i{font-size:9px}
+    .seat .tag{font-size:8.5px;padding:1px 6px}
+    .btn{padding:9px 6px;font-size:12.5px}
+    .hint{font-size:10px}
+    .eqchip{left:2%;top:3%;padding:4px 7px;min-width:62px}
+    .eqchip .vv{font-size:12px}
+    .eqchip .lb{font-size:8px}
+    .actionbar{padding:4px 8px 8px}
+  }
+  @media (max-width:620px){
+    #overlay{padding:14px 12px;gap:7px;justify-content:flex-start;padding-top:28px}
+    #ovTitle{font-size:32px}
+    #ovSub{font-size:9px}
+    #ovText{font-size:11px;line-height:1.7}
+    .fan{transform:scale(.62);margin:-22px 0}
+    .ovrank b{font-size:15px}
+    .modes{flex-wrap:wrap;justify-content:center;gap:6px}
+    .modes button{padding:7px 11px;font-size:10.5px}
+    .tables{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+    .tchip{padding:6px 3px}
+    .tchip b{font-size:11px}
+    .tchip i{font-size:8px;white-space:normal;line-height:1.35}
+    .ovBtns{flex-wrap:wrap;justify-content:center}
+    #overlay #ovBtn{padding:10px 30px;font-size:13px}
+    .ovBtns .ghost{padding:9px 13px;font-size:11px}
+    .tips{font-size:9px}
+    .brokeline{flex-direction:column;gap:6px;font-size:10.5px}
+    .drawer{width:100vw}
+  }
+  @media (orientation:landscape) and (max-height:560px){
+    #overlay{justify-content:flex-start;padding:12px 10px}
+    #ovTitle{font-size:26px}
+    .fan{transform:scale(.62);margin:-18px 0}
+    .table{width:auto;height:calc(100dvh - 128px);max-width:calc(100vw - 20px)}
+    .topbar{padding:4px 10px 2px}
+    .brand span{display:none}
+    .actionbar{padding:2px 10px 6px}
+    .btn{padding:8px 6px;font-size:12px}
+    .hint{font-size:10px}
+  }
+  #intro{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;background:radial-gradient(circle at 50% 42%,#0a231c,#030b09 70%);
+    transition:opacity .34s ease;pointer-events:none}
+  #intro.out{opacity:0}
+  .in-fan{display:flex;justify-content:center;height:104px;align-items:flex-end}
+  .in-fan i{display:block;width:58px;height:82px;margin:0 -13px;border-radius:7px;
+    background:linear-gradient(160deg,#fffdf7,#e8e3d6);box-shadow:0 8px 22px rgba(0,0,0,.55);
+    transform:translateY(38px) rotate(var(--r)) scale(.86);opacity:0;
+    animation:inDeal .42s cubic-bezier(.2,.9,.3,1.25) forwards;animation-delay:calc(var(--i) * 55ms)}
+  @keyframes inDeal{to{transform:translateY(0) rotate(var(--r)) scale(1);opacity:1}}
+  .in-title{font-size:34px;font-weight:800;letter-spacing:.16em;color:#f4e6bd;
+    opacity:0;animation:inUp .45s .22s ease forwards;text-shadow:0 4px 26px rgba(232,200,121,.35)}
+  .in-sub{font-size:9.5px;letter-spacing:.42em;color:#7f9c92;opacity:0;
+    animation:inUp .45s .34s ease forwards}
+  @keyframes inUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  #rotate{position:fixed;inset:0;z-index:210;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;background:#04100c;text-align:center;padding:30px}
+  #rotate .rot-ico{font-size:52px;animation:rotHint 1.8s ease-in-out infinite}
+  @keyframes rotHint{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
+  #rotate p{margin:0;font-size:15px;letter-spacing:.16em;color:#e8c879}
+  #rotate span{font-size:11px;color:#6f8d82;letter-spacing:.08em}
+  @media (orientation:portrait) and (max-width:900px){
+    #rotate{display:flex}
+  }
+</style>
+</head>
+<body>
+<div id="intro">
+  <div class="in-fan">
+    <i style="--i:0;--r:-16deg"></i><i style="--i:1;--r:-8deg"></i><i style="--i:2;--r:0deg"></i><i style="--i:3;--r:8deg"></i><i style="--i:4;--r:16deg"></i>
+  </div>
+  <div class="in-title">德州扑克</div>
+  <div class="in-sub">NO-LIMIT HOLD'EM</div>
+</div>
+<div id="rotate">
+  <div class="rot-ico">📱</div>
+  <p>请把手机横过来</p>
+  <span>横屏才是这张牌桌的正确打开方式</span>
+</div>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">德州扑克 <span>HOLD'EM</span></div>
+    <div class="life" id="lifeTag">第一世</div>
+    <div class="spacer"></div>
+    <div class="info">
+      <span>现金 <b id="cashTxt">¥2,000</b></span>
+      <span id="tableTxt">散台</span>
+      <span id="handNo">第 1 手</span>
+    </div>
+    <button class="ghost" id="btnCast">牌桌</button>
+    <button class="ghost" id="btnWallet">钱包</button>
+    <button class="ghost" id="btnReview">复盘</button>
+    <button class="ghost" id="btnMusic">♪ 开</button>
+    <button class="ghost" id="btnMenu">菜单</button>
+  </div>
+
+  <div class="layout">
+    <div class="stage">
+      <div class="table" id="table">
+        <div id="seats"></div>
+        <div class="eqchip hide" id="eqChip">
+          <div class="lb">胜率</div>
+          <div class="vv" id="eqChipV">—</div>
+          <div class="bb"><i id="eqChipB"></i></div>
+        </div>
+        <div class="pot"><span>底池</span><b id="pot">0</b></div>
+        <div class="board" id="board"></div>
+        <div class="stage-lab" id="stageLab">PRE-FLOP</div>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+
+    <aside class="side" id="sidePanel">
+      <div class="sidehead">
+        <span>牌桌信息</span>
+        <button class="linkbtn" id="sideCollapse">收起 ›</button>
+      </div>
+      <div class="panel">
+        <h4 style="display:flex;justify-content:space-between;align-items:center">
+          <span>钱包</span><button class="linkbtn" id="btnBoard">明细 ›</button>
+        </h4>
+        <div class="cashline">
+          <span class="cashbig" id="cashBig">¥2,000</span>
+          <span class="lvltag" id="lvlBadge">散台客</span>
+        </div>
+        <div class="debtline" id="debtLine">无欠款</div>
+      </div>
+      <div class="panel">
+        <h4>你的胜率</h4>
+        <div class="eqwrap"><div class="eqbar" id="eqBar"></div></div>
+        <div class="eqtxt" id="eqTxt">—</div>
+      </div>
+      <div class="panel">
+        <h4>对手读取</h4>
+        <div class="read" id="readout">还没看出你的路数。</div>
+      </div>
+      <div class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <h4>牌局记录</h4>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+  </div>
+
+  <button class="sidetab" id="sideExpand">信息</button>
+
+  <div class="actionbar idle" id="bar">
+    <div class="clockbar" id="clockBar"><i id="clockFill"></i></div>
+    <div class="betctrl" id="betctrl">
+      <input type="range" id="slider" min="20" max="2000" step="10" value="20">
+      <div class="amt" id="amt">加注到 <b>20</b></div>
+      <div class="presets">
+        <button data-f="0.5">½ 池</button>
+        <button data-f="0.75">¾ 池</button>
+        <button data-f="1">满池</button>
+        <button data-f="allin">全下</button>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn fold" id="btnFold">弃牌</button>
+      <button class="btn call" id="btnCall">过牌</button>
+      <button class="btn raise" id="btnRaise">加注</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+</div>
+
+<div id="review" class="drawer-wrap">
+  <div class="backdrop" id="revBg"></div>
+  <div class="drawer">
+    <div class="rhead"><span>手牌复盘</span><button class="ghost" id="revClose">关闭</button></div>
+    <div class="rbody" id="revBody"></div>
+  </div>
+</div>
+
+<div id="boardDrawer" class="drawer-wrap">
+  <div class="backdrop" id="boardBg"></div>
+  <div class="drawer">
+    <div class="rhead"><span>钱包 / 流水</span><button class="ghost" id="boardClose">关闭</button></div>
+    <div class="rbody" id="boardBody"></div>
+  </div>
+</div>
+
+<div id="contbar" class="contbar">
+  <button class="cbmin" id="cbMin">收起</button>
+  <div class="cbhand" id="cbTitle">本手结束</div>
+  <div class="cbamt even" id="cbAmt">0</div>
+  <div class="cbmeta" id="cbSub"></div>
+  <div class="cbbtns">
+    <button id="cbNext">继续下一手</button>
+    <button id="cbLeave" class="ghost">离桌结算</button>
+  </div>
+</div>
+
+
+<div id="castDrawer" class="drawer-wrap">
+  <div class="backdrop" id="castBg"></div>
+  <div class="drawer">
+    <div class="rhead"><span>牌桌 · 人物</span><button class="ghost" id="castClose">关闭</button></div>
+    <div class="rbody" id="castBody"></div>
+  </div>
+</div>
+<div id="rebirth">
+  <div class="rbbox">
+    <div class="rblife" id="rbLife">第 一 世 · 终</div>
+    <h2 class="rbtitle" id="rbTitle">落魄之魂</h2>
+    <p class="rbline" id="rbLine"></p>
+    <div class="rbstats">
+      <div><i>巅峰资产</i><b id="rbPeak">¥0</b></div>
+      <div><i>终局现金</i><b id="rbFinal">¥0</b></div>
+      <div><i>这一世盈亏</i><b id="rbNet">¥0</b></div>
+      <div><i>手牌 / 场次</i><b id="rbHands">0 / 0</b></div>
+    </div>
+    <p class="rbwarn">重来之后，现金回到 ¥2,000，债务、流水、等级全部归零。<br>
+      留下的只有上面这些数字，和你在牌桌上的名声。</p>
+    <button class="rbhold" id="rbHold">
+      <span class="rbfill" id="rbFill"></span>
+      <span class="rbtxt" id="rbTxt">长按 2 秒 · 重获新生</span>
+    </button>
+    <button class="rbno" id="rbCancel">再想想</button>
+  </div>
+</div>
+<div id="event" class="hide">
+  <div class="evbox">
+    <div class="evwho" id="evWho">刀疤强 · 高利贷</div>
+    <h3 id="evTitle">上门收数</h3>
+    <p id="evText"></p>
+    <div class="evbtns" id="evBtns"></div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="fan" id="fan"></div>
+  <h1 id="ovTitle">德州扑克</h1>
+  <p id="ovSub">NO-LIMIT HOLD'EM</p>
+  <div class="ovrank" id="ovRank"><span id="ovRankIcon">💵</span><b id="ovRankName">¥2,000</b><i id="ovRankPt">散台客</i><span class="ovlife hide" id="ovLife">第二世</span></div>
+  <div class="ovboard" id="ovBoard">资产排行 · 计算中</div>
+  <p class="small" id="ovText">开局 2,000 块。小桌子赢到钱，才有资格进更里面的厅。<br>输光了？钱包里能借——银行的利息还行，高利贷会让你睡不着。</p>
+  <div class="modes" id="modeSel">
+    <button data-seats="2">双人场</button>
+    <button data-seats="4">四人场</button>
+    <button data-seats="6">六人场</button>
+  </div>
+  <div class="tables" id="tableSel"></div>
+  <div class="ovBtns">
+    <button id="ovBtn">入座</button>
+    <button class="ghost" id="ovMusic">♪ 音乐：开</button>
+    <button class="ghost" id="ovWallet">钱包</button>
+    <button class="ghost" id="btnInstall" style="display:none">⬇ 安装到桌面</button>
+  </div>
+  <div class="brokeline hide" id="brokeLine">
+    <span>你已经身无分文，连散台的买入都摸不出来。</span>
+    <button class="ghost" id="ovRebirth">结束这一世 ›</button>
+  </div>
+  <p class="tips">鼠标点选下注 · 键盘 F 弃牌 / C 跟注 / R 加注</p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rnd = Math.random;
+  const niceNum = (s) => s.replace(/\.?0+$/, '');
+  const NN = (n) => {
+    const v = Math.round(n);
+    const a = Math.abs(v);
+    if (a >= 1e8) return niceNum((v / 1e8).toFixed(2)) + '亿';
+    if (a >= 1e4) {
+      const w = v / 1e4;
+      if (Math.abs(w) >= 9999.5) return niceNum((v / 1e8).toFixed(2)) + '亿';
+      return niceNum(w.toFixed(1)) + '万';
+    }
+    return v.toLocaleString('en-US');
+  };
+  const roundBet = (v) => (BB >= 20 ? Math.round(v / 10) * 10 : Math.round(v));
+
+  const SUITS = ['♠', '♥', '♣', '♦'];
+  const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  let BB = 20, SB = 10, START = 2000;
+
+  /* ============================================================
+     背景音乐：纯 WebAudio 合成，不依赖外部音频
+     ============================================================ */
+  const Music = (() => {
+    let ac = null, master = null, noiseBuf = null, timer = null;
+    let step = 0, nextT = 0, on = false, built = false;
+    const BPM = 92, BEAT = 60 / BPM, EIGHTH = BEAT / 2, BAR = BEAT * 4;
+    const PROG = [
+      { r: 45, pad: [57, 60, 64, 67] },        // Am7
+      { r: 41, pad: [53, 57, 60, 64] },        // Fmaj7
+      { r: 36, pad: [60, 64, 67, 71] },        // Cmaj7
+      { r: 43, pad: [55, 59, 62, 67] }         // G
+    ];
+    const MEL = [
+      [76, 72],
+      [74, 69],
+      [76, 79],
+      [74, 71]
+    ];
+    const hz = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+    function build() {
+      if (built) return true;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      try { ac = new AC(); } catch (e) { return false; }
+      master = ac.createGain();
+      master.gain.value = 0.0001;
+      master.connect(ac.destination);
+      const len = Math.floor(ac.sampleRate * 1.0);
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      built = true;
+      return true;
+    }
+
+    function tone(freq, t, dur, type, gain, cut) {
+      const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+      o.type = type;
+      o.frequency.value = freq;
+      f.type = 'lowpass';
+      f.frequency.value = cut;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(f); f.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
+
+    function hit(t, gain, freq, dur, type) {
+      const s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+      s.buffer = noiseBuf;
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = 0.9;
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f); f.connect(g); g.connect(master);
+      s.start(t); s.stop(t + dur + 0.03);
+    }
+
+    function pad(freq, t, dur, gain) {
+      for (const det of [-5, 5]) {
+        const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.value = freq;
+        o.detune.value = det;
+        f.type = 'lowpass';
+        f.frequency.value = 1500;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(gain, t + 0.9);
+        g.gain.setValueAtTime(gain, t + dur);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 1.5);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(t); o.stop(t + dur + 1.6);
+      }
+    }
+
+    function kick(t, gain) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(118, t);
+      o.frequency.exponentialRampToValueAtTime(44, t + 0.13);
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + 0.26);
+    }
+
+    function stepAt(s, t) {
+      const bar = Math.floor(s / 8) % PROG.length;
+      const e = s % 8;
+      const ch = PROG[bar];
+      const mel = MEL[bar % MEL.length];
+
+      if (e === 0) for (const n of ch.pad) pad(hz(n), t, BAR * 0.98, 0.017);
+      if (e === 0 || e === 4) kick(t, 0.26);
+      if (e === 2 || e === 6) hit(t, 0.05, 1900, 0.13, 'bandpass');
+      hit(t, e % 2 ? 0.008 : 0.014, 8200, 0.045, 'highpass');
+
+      // 低频律动：根音打底，切分处换五度/八度
+      if (e === 0) tone(hz(ch.r), t, 0.42, 'sine', 0.13, 260);
+      if (e === 3) tone(hz(ch.r), t, 0.24, 'sine', 0.09, 260);
+      if (e === 4) tone(hz(ch.r + 7), t, 0.36, 'sine', 0.11, 280);
+      if (e === 6) tone(hz(ch.r + 12), t, 0.22, 'sine', 0.07, 280);
+
+      if (e === 0) tone(hz(mel[0]), t + 0.02, 1.1, 'triangle', 0.05, 2600);
+      if (e === 5) tone(hz(mel[1]), t, 1.0, 'triangle', 0.04, 2600);
+    }
+
+    function tick() {
+      if (!ac || !on) return;
+      const now = ac.currentTime;
+      if (nextT < now - 0.3) { nextT = now + 0.1; step = 0; }
+      while (nextT < now + 0.8) {
+        stepAt(step, nextT);
+        nextT += EIGHTH;
+        step++;
+      }
+    }
+
+    function start() {
+      if (!build()) return;
+      if (ac.state === 'suspended') ac.resume();
+      on = true;
+      if (!timer) timer = setInterval(tick, 60);
+      const t = ac.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), t);
+      master.gain.linearRampToValueAtTime(0.85, t + 1.8);
+      nextT = 0;
+    }
+
+    function stop() {
+      if (!ac) return;
+      on = false;
+      const t = ac.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), t);
+      master.gain.linearRampToValueAtTime(0.0001, t + 0.45);
+    }
+
+    function sfx(kind) {
+      if (!ac || !built) return;
+      const t = ac.currentTime + 0.005;
+      if (kind === 'tick') {
+        hit(t, 0.055, 3800, 0.035, 'highpass');
+      }
+      if (kind === 'buzz') {
+        tone(190, t, 0.26, 'square', 0.05, 900);
+        tone(120, t + 0.02, 0.3, 'sine', 0.07, 500);
+      }
+      if (kind === 'fold') {
+        // 牌被甩出去：带扫频的纸片声
+        const s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+        s.buffer = noiseBuf;
+        f.type = 'bandpass';
+        f.Q.value = 1.1;
+        f.frequency.setValueAtTime(3600, t);
+        f.frequency.exponentialRampToValueAtTime(700, t + 0.2);
+        g.gain.setValueAtTime(0.17, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        s.connect(f); f.connect(g); g.connect(master);
+        s.start(t); s.stop(t + 0.26);
+        // 牌落在桌面上
+        tone(96, t + 0.1, 0.2, 'sine', 0.15, 380);
+        hit(t + 0.1, 0.08, 900, 0.12, 'lowpass');
+      }
+    }
+
+    return {
+      start,
+      sfx,
+      toggle() { if (on) { stop(); } else { start(); } return on; },
+      isOn() { return on; }
+    };
+  })();
+
+  function playSfx(kind) {
+    if (musicMuted) return;
+    try { Music.sfx(kind); } catch (e) {}
+  }
+
+  /* ============================================================
+     牌型评估
+     ============================================================ */
+  const _rc = new Int8Array(13);
+  const _sc = new Int8Array(4);
+  let _det = null;
+
+  function straightHigh(mask) {
+    for (let hi = 12; hi >= 4; hi--) {
+      const need = 0x1f << (hi - 4);
+      if ((mask & need) === need) return hi;
+    }
+    if ((mask & 0x100f) === 0x100f) return 3;
+    return -1;
+  }
+  function emit(cat, ks, want) {
+    if (want) _det = { cat, ks };
+    let v = cat;
+    for (let i = 0; i < 5; i++) v = v * 15 + (ks[i] === undefined ? 0 : ks[i] + 1);
+    return v;
+  }
+  function eval7(cards, want) {
+    _rc.fill(0); _sc.fill(0);
+    for (let i = 0; i < cards.length; i++) { const c = cards[i]; _rc[c >> 2]++; _sc[c & 3]++; }
+    let fs = -1;
+    for (let s = 0; s < 4; s++) if (_sc[s] >= 5) { fs = s; break; }
+    if (fs >= 0) {
+      let mask = 0;
+      for (let i = 0; i < cards.length; i++) { const c = cards[i]; if ((c & 3) === fs) mask |= 1 << (c >> 2); }
+      const st = straightHigh(mask);
+      if (st >= 0) return emit(8, [st], want);
+      const top = [];
+      for (let r = 12; r >= 0 && top.length < 5; r--) if (mask & (1 << r)) top.push(r);
+      return emit(5, top, want);
+    }
+    const quads = [], trips = [], pairs = [], singles = [];
+    for (let r = 12; r >= 0; r--) {
+      const n = _rc[r];
+      if (n === 4) quads.push(r);
+      else if (n === 3) trips.push(r);
+      else if (n === 2) pairs.push(r);
+      else if (n === 1) singles.push(r);
+    }
+    if (quads.length) {
+      let kick = -1;
+      for (let r = 12; r >= 0; r--) if (r !== quads[0] && _rc[r] > 0) { kick = r; break; }
+      return emit(7, [quads[0], kick], want);
+    }
+    if (trips.length) {
+      const ph = trips.length >= 2 ? trips[1] : (pairs.length ? pairs[0] : -1);
+      if (ph >= 0) return emit(6, [trips[0], ph], want);
+    }
+    let mask = 0;
+    for (let r = 0; r < 13; r++) if (_rc[r] > 0) mask |= 1 << r;
+    const st = straightHigh(mask);
+    if (st >= 0) return emit(4, [st], want);
+    if (trips.length) {
+      const ks = [trips[0]];
+      for (let r = 12; r >= 0 && ks.length < 3; r--) if (_rc[r] && r !== trips[0]) ks.push(r);
+      return emit(3, ks, want);
+    }
+    if (pairs.length >= 2) {
+      const ks = [pairs[0], pairs[1]];
+      for (let r = 12; r >= 0; r--) if (_rc[r] && r !== pairs[0] && r !== pairs[1]) { ks.push(r); break; }
+      return emit(2, ks, want);
+    }
+    if (pairs.length === 1) {
+      const ks = [pairs[0]];
+      for (let r = 12; r >= 0 && ks.length < 4; r--) if (_rc[r] && r !== pairs[0]) ks.push(r);
+      return emit(1, ks, want);
+    }
+    return emit(0, singles.slice(0, 5), want);
+  }
+  function describe(cards) {
+    eval7(cards, true);
+    const d = _det, K = d.ks.map((r) => RANKS[r]);
+    switch (d.cat) {
+      case 0: return '高牌 ' + K[0];
+      case 1: return '一对 ' + K[0];
+      case 2: return '两对 ' + K[0] + '/' + K[1];
+      case 3: return '三条 ' + K[0];
+      case 4: return '顺子 ' + K[0] + ' 高';
+      case 5: return '同花 ' + K[0] + ' 高';
+      case 6: return '葫芦 ' + K[0] + ' 带 ' + K[1];
+      case 7: return '四条 ' + K[0];
+      default: return '同花顺 ' + K[0] + ' 高';
+    }
+  }
+
+  /* ============================================================
+     多人胜率
+     ============================================================ */
+  function equityN(hole, board, iters, nOpp) {
+    if (!hole || hole.length !== 2 || nOpp < 1) return 0.5;
+    const used = new Uint8Array(52);
+    for (let i = 0; i < hole.length; i++) used[hole[i]] = 1;
+    for (let i = 0; i < board.length; i++) used[board[i]] = 1;
+    const avail = [];
+    for (let c = 0; c < 52; c++) if (!used[c]) avail.push(c);
+    const n = avail.length;
+    const need = 5 - board.length;
+    const draws = need + 2 * nOpp;
+    const fb = new Array(5), m7 = new Array(7), o7 = new Array(7);
+    const myFixed = need === 0 ? eval7(hole.concat(board)) : 0;
+    let pts = 0;
+    for (let it = 0; it < iters; it++) {
+      for (let k = 0; k < draws; k++) {
+        const j = k + ((rnd() * (n - k)) | 0);
+        const t = avail[k]; avail[k] = avail[j]; avail[j] = t;
+      }
+      for (let i = 0; i < 5; i++) fb[i] = i < board.length ? board[i] : avail[i - board.length];
+      let mine;
+      if (need === 0) mine = myFixed;
+      else {
+        m7[0] = hole[0]; m7[1] = hole[1];
+        for (let i = 0; i < 5; i++) m7[2 + i] = fb[i];
+        mine = eval7(m7);
+      }
+      let best = -1, ties = 0;
+      for (let k = 0; k < nOpp; k++) {
+        o7[0] = avail[need + 2 * k];
+        o7[1] = avail[need + 2 * k + 1];
+        for (let i = 0; i < 5; i++) o7[2 + i] = fb[i];
+        const sc = eval7(o7);
+        if (sc > best) { best = sc; ties = 1; }
+        else if (sc === best) ties++;
+      }
+      if (mine > best) pts += 1;
+      else if (mine === best) pts += 1 / (ties + 1);
+    }
+    return pts / iters;
+  }
+
+  /* ============================================================
+     牌桌配置
+     ============================================================ */
+  const MODES = { 2: [0, 3], 4: [0, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
+  const MODE_NAME = { 2: '双人场', 4: '四人场', 6: '六人场' };
+
+  const YOU = { n: '你', av: '🐋', you: true, tag: '你' };
+  const BOTS = [
+    { n: '石头', av: '🗿', tag: '紧凶', aggr: 1.1, tight: 1.12, bluff: 0.85 },
+    { n: '阿飞', av: '🦊', tag: '松凶', aggr: 1.25, tight: 0.88, bluff: 1.35 },
+    { n: '小美', av: '🐱', tag: '难缠', aggr: 0.95, tight: 1.0, bluff: 1.05 },
+    { n: '老陈', av: '🐢', tag: '紧弱', aggr: 0.7, tight: 1.3, bluff: 0.5 },
+    { n: '大熊', av: '🐻', tag: '跟注站', aggr: 0.72, tight: 0.78, bluff: 0.9 }
+  ];
+
+  /* ---------- 各牌桌的人物谱：身家 / 性格 / 背景 / 口头禅 ---------- */
+  const CAST = [
+    [
+      { id: 'c01', n: '阿飞', av: '🦊', tag: '松凶', pt: '张扬', w: 6000, aggr: 1.32, tight: 0.85, bluff: 1.45,
+        bg: '白天在工地，晚上泡散台。赢钱就请全场喝啤酒，输光了第二天照样来。',
+        q: ['散台的钱最好赚。', '再来一把，我不信你还有。'] },
+      { id: 'c02', n: '老周', av: '🐢', tag: '紧弱', pt: '谨慎', w: 18000, aggr: 0.7, tight: 1.32, bluff: 0.5, kind: 1,
+        bg: '纺织厂退休工人，一个月来两次。输赢不影响他第二天早上那碗豆浆。',
+        q: ['打了一辈子工，这点钱输得起。', '慢慢来，急什么。'] },
+      { id: 'c03', n: '小胖', av: '🐷', tag: '跟注站', pt: '憨厚', w: 45000, aggr: 0.75, tight: 0.8, bluff: 0.85, kind: 1,
+        bg: '给棋牌室送外卖的，攒下的钱全在牌桌上。输光了就笑，说下次再来。',
+        q: ['我这人不太会弃牌。', '赢了请你吃夜宵。'] }
+    ],
+    [
+      { id: 'c04', n: '陈姐', av: '🐍', tag: '紧凶', pt: '精明', w: 90000, aggr: 1.12, tight: 1.1, bluff: 1.0,
+        bg: '棋牌室老板娘。见过太多人从这张桌子上去，也从这张桌子下来。',
+        q: ['在我这儿，规矩比运气重要。', '少说话，多下注。'] },
+      { id: 'c05', n: '亮仔', av: '🦁', tag: '松凶', pt: '急躁', w: 220000, aggr: 1.3, tight: 0.85, bluff: 1.3,
+        bg: '跑医疗器械的销售，业绩好的那个月，一晚上能输掉半年提成。',
+        q: ['这把我要把上把的赢回来。', '别磨蹭，快点。'] },
+      { id: 'c06', n: '老K', av: '🐺', tag: '难缠', pt: '阴狠', w: 70000, aggr: 1.05, tight: 1.15, bluff: 1.2,
+        bg: '二十年前在澳门待过，右手中指少了一截，没人知道来历。',
+        q: ['看牌之前先看人。', '你还嫩。'] }
+    ],
+    [
+      { id: 'c07', n: '苏小姐', av: '🐱', tag: '紧凶', pt: '冷傲', w: 450000, aggr: 1.1, tight: 1.18, bluff: 0.95,
+        bg: '外企财务总监，每周三晚上固定出现。输赢都记在一个旧本子上。',
+        q: ['我算过了，这把该我跟。', '别用那种眼神看我。'] },
+      { id: 'c08', n: '王总', av: '🐻', tag: '跟注站', pt: '粗豪', w: 900000, aggr: 0.9, tight: 0.78, bluff: 1.1,
+        bg: '包工头出身，接了个大工程之后再没缺过钱。嗓门比筹码响。',
+        q: ['钱不是问题，牌才是。', '谁敢加，我跟到底。'] },
+      { id: 'c09', n: '阿豹', av: '🐯', tag: '松凶', pt: '暴烈', w: 260000, aggr: 1.38, tight: 0.8, bluff: 1.5,
+        bg: '收保护费起家，脾气比牌技差得多。输急了会拍桌子。',
+        q: ['你再看我一眼试试。', '这把梭了。'] }
+    ],
+    [
+      { id: 'c10', n: '林律师', av: '🐢', tag: '紧弱', pt: '沉稳', w: 2000000, aggr: 0.72, tight: 1.3, bluff: 0.55,
+        bg: '打并购官司的，一天赚的够这桌一晚。他只是单纯喜欢这个地方。',
+        q: ['我从不做没有胜算的案子，也不下没有把握的注。', '稍等，让我想清楚。'] },
+      { id: 'c11', n: '赵老板', av: '🍜', tag: '松凶', pt: '圆滑', w: 4000000, aggr: 1.22, tight: 0.9, bluff: 1.25,
+        bg: '开连锁火锅的，二十三家店。桌上输赢从来不影响他笑。',
+        q: ['吃了吗？没吃先吃饱再来打。', '输赢都是缘分。'] },
+      { id: 'c12', n: '袁先生', av: '🎩', tag: '难缠', pt: '傲慢', w: 6000000, aggr: 1.15, tight: 0.95, bluff: 1.35,
+        bg: '矿老板的儿子。花的是家里的钱，输的是自己的脸。',
+        q: ['这点钱对我来说不算什么。', '你打得太小了。'] }
+    ],
+    [
+      { id: 'c13', n: '周会长', av: '💼', tag: '紧凶', pt: '老练', w: 12000000, aggr: 1.1, tight: 1.12, bluff: 1.0,
+        bg: '商会会长。牌桌上谈成过三笔生意，也拆散过两个家庭。',
+        q: ['牌桌是最诚实的地方。', '你今天的运气，我记下了。'] },
+      { id: 'c14', n: '沈公子', av: '🥂', tag: '松凶', pt: '轻浮', w: 24000000, aggr: 1.3, tight: 0.82, bluff: 1.4,
+        bg: '家里有船。输一晚上，第二天照样出海。',
+        q: ['玩不起就别坐这桌。', '再来，我不差钱。'] },
+      { id: 'c15', n: '老刀', av: '🔪', tag: '紧凶', pt: '冷硬', w: 9000000, aggr: 1.05, tight: 1.22, bluff: 0.9,
+        bg: '开当铺的。这栋楼里谁的底细他都清楚，包括你。',
+        q: ['你缺钱的时候，会来找我的。', '别装，我看得出来。'] }
+    ],
+    [
+      { id: 'c16', n: '秦先生', av: '🕴️', tag: '紧凶', pt: '城府', w: 30000000, aggr: 1.08, tight: 1.15, bluff: 1.1,
+        bg: '做资本的。桌上的钱没有一分是真的属于他自己的。',
+        q: ['别紧张，我不吃人。', '这手牌，你打得太诚实了。'] },
+      { id: 'c17', n: '白太太', av: '💎', tag: '难缠', pt: '矜贵', w: 60000000, aggr: 1.0, tight: 1.05, bluff: 1.15,
+        bg: '名媛。来顶楼不是因为想赢，是因为别的地方太无聊。',
+        q: ['输赢？我无所谓。', '你们男人打牌真慢。'] },
+      { id: 'c18', n: '铁叔', av: '🔧', tag: '紧凶', pt: '老辣', w: 45000000, aggr: 1.15, tight: 1.18, bluff: 1.0,
+        bg: '早年在东南亚做局，金盆洗手后只为兴趣坐这张桌。',
+        q: ['小伙子，你的手在抖。', '这行我干了三十年。'] }
+    ],
+    [
+      { id: 'c19', n: '霍老板', av: '🏗️', tag: '紧凶', pt: '霸道', w: 90000000, aggr: 1.2, tight: 1.1, bluff: 1.2,
+        bg: '地产商。习惯把人逼到墙角，牌桌也一样。',
+        q: ['我拿地的时候，你还在读书。', '跟不跟，一句话。'] },
+      { id: 'c20', n: '温先生', av: '📉', tag: '难缠', pt: '冷静', w: 120000000, aggr: 1.0, tight: 1.12, bluff: 1.0,
+        bg: '私募基金经理。把牌桌当成风险模型在跑。',
+        q: ['概率不会骗人，人会。', '你的范围太窄了。'] },
+      { id: 'c21', n: '九爷', av: '🐲', tag: '松凶', pt: '深沉', w: 70000000, aggr: 1.25, tight: 0.88, bluff: 1.3,
+        bg: '地下钱庄的话事人。钱对他只是流通的东西。',
+        q: ['这桌上，钱比人干净。', '别问我的名字。'] }
+    ],
+    [
+      { id: 'c22', n: '龙先生', av: '🐉', tag: '紧凶', pt: '威严', w: 250000000, aggr: 1.18, tight: 1.12, bluff: 1.05,
+        bg: '赌场股东。这间包厢是他自己的，灯光角度都是他定的。',
+        q: ['这里的规矩，是我定的。', '你赢的每一分，我都看着。'] },
+      { id: 'c23', n: '柳小姐', av: '🌸', tag: '难缠', pt: '神秘', w: 400000000, aggr: 1.05, tight: 1.08, bluff: 1.3,
+        bg: '没人知道她做什么生意。只知道她几乎不输。',
+        q: ['你猜我手里是什么？', '我喜欢赢，更喜欢看人输。'] },
+      { id: 'c24', n: '傅老板', av: '🏭', tag: '紧弱', pt: '厚重', w: 180000000, aggr: 0.75, tight: 1.3, bluff: 0.6,
+        bg: '做实业的。一辈子没经历过这么大的波动，但他坐得住。',
+        q: ['我这个人，不赌。', '这只是生意的一部分。'] }
+    ],
+    [
+      { id: 'c25', n: '孔先生', av: '⛏️', tag: '紧凶', pt: '孤高', w: 800000000, aggr: 1.15, tight: 1.15, bluff: 1.0,
+        bg: '矿业巨头。半年出现一次，每次坐满一夜。',
+        q: ['钱到我这个数，就只是个数字了。', '你还在算底池？'] },
+      { id: 'c26', n: '江女士', av: '📊', tag: '难缠', pt: '精准', w: 1200000000, aggr: 1.08, tight: 1.12, bluff: 1.05,
+        bg: '量化基金掌门。她打牌的样子像在跑一段程序。',
+        q: ['我的模型说这把该弃。', '情绪是成本。'] },
+      { id: 'c27', n: '慕容', av: '🏯', tag: '松凶', pt: '狂傲', w: 600000000, aggr: 1.35, tight: 0.85, bluff: 1.45,
+        bg: '世家子弟。家里三代都在赌，他是最不信邪的那个。',
+        q: ['我家三代人，没人在乎这点钱。', '来吧，让我看看你的极限。'] }
+    ],
+    [
+      { id: 'c28', n: '老鬼', av: '👻', tag: '紧凶', pt: '莫测', w: 3000000000, aggr: 1.12, tight: 1.15, bluff: 1.15,
+        bg: '没人知道真名。据说他赢过三个赌场老板的全部身家。',
+        q: ['年轻人，坐下就别后悔。', '我看过比你更好的牌。'] },
+      { id: 'c29', n: '天九', av: '🀄', tag: '难缠', pt: '不败', w: 5000000000, aggr: 1.1, tight: 1.1, bluff: 1.2,
+        bg: '十年来没在这张桌上输过。有人说他出千，但没人抓得住。',
+        q: ['这桌还没人让我认真过。', '你还有多少？'] },
+      { id: 'c30', n: '无名', av: '🎭', tag: '紧凶', pt: '虚无', w: 2000000000, aggr: 1.05, tight: 1.2, bluff: 1.1,
+        bg: '从不上报姓名。赢了就走，输了就再来，像个影子。',
+        q: ['……', '牌说话。'] }
+    ]
+  ];
+
+  const SAY = {
+    win: ['这把我收了。', '谢谢老板。', '牌不错，可惜你看得太晚。', '别急，下一把还有机会。', '你太想赢了。'],
+    lose: ['行啊，藏得够深。', '运气站你那边。', '这手我认了。', '有意思，再来。', '打得漂亮。'],
+    rich: ['今天手气旺啊。', '再这么赢下去，这桌不够你玩的了。', '你是来收钱的吧？'],
+    broke: ['你这筹码还撑得住吗？', '要不要先歇一把？', '别硬撑，输光了没人会客气。'],
+    invite: ['跟我上楼坐坐？上面的人钱多。', '你有胆跟我去高额桌吗？']
+  };
+
+  const castOf = (tier) => CAST[Math.min(CAST.length - 1, Math.max(0, tier))];
+  const P = [];
+  const G = {
+    seats: 6, board: [], pot: 0, street: 0, curBet: 0, minRaise: BB,
+    dealer: 5, handNo: 0, over: false,
+    stats: { betFaced: 0, folded: 0, raised: 0, hands: 0, won: 0 }
+  };
+
+  let handToken = 0;
+  let playerResolve = null;
+  let musicMuted = false;
+
+  const potNow = () => G.pot + P.reduce((s, p) => s + p.committed, 0);
+  const livePlayers = () => P.filter((p) => !p.folded && !p.out);
+  const others = (p) => P.filter((q) => q !== p && !q.folded && !q.out);
+
+  /* ============================================================
+     现金 / 赌场等级 / 借贷 / 流水
+     ============================================================ */
+  const TABLES = [
+    { name: '散台', sb: 1, bb: 2, buyin: 200, minCash: 200 },
+    { name: '大厅', sb: 2, bb: 5, buyin: 500, minCash: 1000 },
+    { name: '银卡厅', sb: 5, bb: 10, buyin: 1000, minCash: 2500 },
+    { name: '金卡厅', sb: 10, bb: 20, buyin: 2000, minCash: 6000 },
+    { name: '黑卡厅', sb: 25, bb: 50, buyin: 5000, minCash: 20000 },
+    { name: '顶楼', sb: 50, bb: 100, buyin: 10000, minCash: 40000 },
+    { name: '豪客厅', sb: 100, bb: 200, buyin: 20000, minCash: 80000 },
+    { name: '私人包厢', sb: 500, bb: 1000, buyin: 100000, minCash: 400000 },
+    { name: '钻石厅', sb: 1000, bb: 2000, buyin: 200000, minCash: 800000 },
+    { name: '传说之桌', sb: 5000, bb: 10000, buyin: 1000000, minCash: 4000000 }
+  ];
+  const LEVELS = ['散台客', '大厅常客', '银卡会员', '金卡会员', '黑卡会员', '顶楼贵宾',
+    '豪客', '包厢主人', '钻石会员', '传说人物'];
+  // 额度与利率随身家浮动：越有钱，银行给得越多、利息越低
+  function peakCash() { return Math.max(W.cash, (W.peakCash || 0) * 0.5); }
+  // 额度只看净资产（现金 - 欠款），借钱本身不会抬高额度
+  function equityNow() { return W.cash - (W.bank || 0) - (W.shark || 0); }
+  function creditBase() { return Math.max(equityNow(), (W.peakEquity || 0) * 0.5); }
+  function bankCap() { return Math.min(20000000, Math.max(2000, Math.round(creditBase() * 1.5 / 1000) * 1000)); }
+  function sharkCap() { return Math.min(50000000, Math.max(4000, Math.round(creditBase() * 3 / 1000) * 1000)); }
+  function bankRate() { return 0.02 + 0.03 * Math.exp(-creditBase() / 20000); }
+  function sharkRate() { return 0.15; }
+  // 斩杀线：欠款超过现金的三倍加一万，债主就会来清算
+  function killLine() { return Math.round(W.cash * 3 + 10000); }
+  function checkExecution() {
+    const debt = (W.bank || 0) + (W.shark || 0);
+    if (debt <= 0) return false;
+    if (debt <= killLine()) return false;
+    W.executed = 1;
+    W.cash = 0;
+    W.bank = 0;
+    W.shark = 0;
+    W.tx.unshift({
+      t: Date.now(), label: '清算 · 刀疤强', amt: 0, bal: 0,
+      note: '欠款 ¥' + NN(debt) + ' 无法偿还'
+    });
+    saveWallet();
+    refreshWallet();
+    showEvent({
+      who: '刀疤强 · 高利贷',
+      title: '该清账了',
+      text: '欠款 ¥' + NN(debt) + '，你的现金 ¥' + NN(W.cash) + '。<br><br>' +
+        '他把你的手按在桌上，很轻地说了一句：<i>「下辈子别借了。」</i>',
+      options: [
+        {
+          label: '闭上眼睛',
+          hint: '结束这一世',
+          onPick: () => { openRebirth(); }
+        }
+      ]
+    });
+    return true;
+  }
+
+  const WALLET_KEY = 'holdem.wallet.v1';
+  const LIVE_KEY = 'holdem.live.v1';
+
+  let W = {
+    cash: 2000, bank: 0, shark: 0, peakCash: 2000, tx: [],
+    cut: 0, cd: 0, peakDebt: 0, streak: 0, ach: [],
+    stats: { games: 0, wins: 0, net: 0, hands: 0, best: 0 }
+  };
+  let selTable = 0;
+  let resetArmed = false;
+  let lastSwept = false;
+
+  function loadWallet() {
+    try {
+      const raw = localStorage.getItem(WALLET_KEY);
+      if (!raw) return;
+      const w = JSON.parse(raw);
+      if (w && typeof w.cash === 'number') {
+        W = w;
+        if (!Array.isArray(W.tx)) W.tx = [];
+        if (!W.stats) W.stats = { games: 0, wins: 0, net: 0, hands: 0, best: 0 };
+        W.bank = W.bank || 0;
+        W.shark = W.shark || 0;
+        W.cut = W.cut || 0;
+        W.cd = W.cd || 0;
+        W.peakDebt = W.peakDebt || 0;
+        W.peakCash = W.peakCash || W.cash;
+        W.streak = W.streak || 0;
+        if (!Array.isArray(W.ach)) W.ach = [];
+        if (!Array.isArray(W.lives)) W.lives = [];
+        if (!Array.isArray(W.loans)) W.loans = [];
+        if (!W.aff || typeof W.aff !== 'object') W.aff = {};
+        if (!W.castW || typeof W.castW !== 'object') W.castW = {};
+        if (!Array.isArray(W.stories)) W.stories = [];
+        if (!Array.isArray(W.feed)) W.feed = [];
+        if (!W.worldSeed) W.worldSeed = (Math.random() * 1e9) | 0;
+        if (!W.selfName) W.selfName = genSelfName();
+        if (!W.peakRank) W.peakRank = 0;
+        if (typeof W.peakEquity !== 'number') W.peakEquity = equityNow();
+        W.life = W.life || 1;
+      }
+    } catch (e) { /* 隐私模式忽略 */ }
+  }
+
+  function seedWallet() {
+    if (W.tx.length) return;
+    W.tx.push({
+      t: Date.now(), label: '入场 · 你带着 2,000 块走进赌场',
+      amt: 2000, bal: 2000, note: ''
+    });
+    saveWallet();
+  }
+
+  function saveWallet() {
+    try { localStorage.setItem(WALLET_KEY, JSON.stringify(W)); } catch (e) {}
+  }
+
+  function addTx(label, amt, note) {
+    W.cash = Math.round(W.cash + amt);
+    W.tx.unshift({
+      t: Date.now(), label, amt: Math.round(amt),
+      bal: Math.round(W.cash), note: note || ''
+    });
+    if (W.tx.length > 200) W.tx.length = 200;
+  }
+
+  const debtTotal = () => W.bank + W.shark;
+
+  function levelIndex(cash) {
+    let idx = 0;
+    for (let i = 0; i < TABLES.length; i++) if (cash >= TABLES[i].minCash) idx = i;
+    return idx;
+  }
+
+  function borrow(kind, amt) {
+    const cap = kind === 'bank' ? bankCap() : sharkCap();
+    const cur = kind === 'bank' ? W.bank : W.shark;
+    const room = Math.max(0, killLine() - ((W.bank || 0) + (W.shark || 0)));
+    const take = Math.min(Math.round(amt), Math.max(0, cap - cur), room);
+    if (take <= 0) return 0;
+    if (kind === 'bank') W.bank += take; else W.shark += take;
+    addTx(kind === 'bank' ? '银行贷款' : '高利贷借入', take);
+    saveWallet();
+    refreshWallet();
+    return take;
+  }
+
+  function repay(kind, amt) {
+    const cur = kind === 'bank' ? W.bank : W.shark;
+    const pay = Math.min(Math.round(amt), cur, Math.max(0, W.cash));
+    if (pay <= 0) return 0;
+    if (kind === 'bank') W.bank -= pay; else W.shark -= pay;
+    addTx(kind === 'bank' ? '还银行贷款' : '还高利贷', -pay);
+    saveWallet();
+    refreshWallet();
+    return pay;
+  }
+
+  function chargeInterest() {
+    const items = [
+      ['bank', Math.round(W.bank * bankRate())],
+      ['shark', Math.round(W.shark * sharkRate())]
+    ];
+    for (const it of items) {
+      const kind = it[0], amt = it[1];
+      if (amt <= 0) continue;
+      const pay = Math.min(amt, W.cash);
+      W.cash -= pay;
+      const rest = amt - pay;
+      if (kind === 'bank') W.bank += rest; else W.shark += rest;
+      W.tx.unshift({
+        t: Date.now(),
+        label: kind === 'bank' ? '银行利息' : '高利贷利息',
+        amt: -pay, bal: Math.round(W.cash),
+        note: rest > 0 ? '欠款 +' + NN(rest) : ''
+      });
+    }
+    if (W.tx.length > 200) W.tx.length = 200;
+  }
+
+  /* ---------- 成就 ---------- */
+  const ACHS = [
+    { id: 'win1', name: '第一桶金', desc: '净赢一场' },
+    { id: 'sweep', name: '清台', desc: '赢光一桌所有人' },
+    { id: 'big', name: '五倍', desc: '单场净赚 5 个买入' },
+    { id: 'debt', name: '无债一身轻', desc: '还清 ¥10,000 以上的债' },
+    { id: 'rich', name: '万元户', desc: '现金达到 ¥10,000' },
+    { id: 'legend', name: '赌圣', desc: '现金达到 ¥1,000,000' },
+    { id: 'tycoon', name: '千万身家', desc: '现金达到 ¥10,000,000' },
+    { id: 'tycoon2', name: '亿万传说', desc: '现金达到 ¥100,000,000' }
+  ];
+
+  function unlock(id) {
+    if (W.ach.indexOf(id) >= 0) return;
+    const a = ACHS.find((x) => x.id === id);
+    if (!a) return;
+    W.ach.push(id);
+    logLine('成就解锁：' + a.name + ' — ' + a.desc, 'hl');
+    toast('成就解锁', a.name, 'good');
+    saveWallet();
+  }
+
+  function checkAch(o) {
+    o = o || {};
+    W.peakDebt = Math.max(W.peakDebt || 0, debtTotal());
+    if (W.stats.wins > 0) unlock('win1');
+    if (o.swept) unlock('sweep');
+    if (o.net > 0 && o.buyin && o.net >= o.buyin * 5) unlock('big');
+    if (W.cash >= 10000) unlock('rich');
+    if (W.cash >= 1000000) unlock('legend');
+    if (W.cash >= 10000000) unlock('tycoon');
+    if (W.cash >= 100000000) unlock('tycoon2');
+    if (W.peakDebt >= 10000 && debtTotal() === 0 && W.ach.indexOf('debt') < 0) unlock('debt');
+  }
+
+  /* ---------- 催收事件 ---------- */
+  function showEvent(cfg) {
+    el.evWho.textContent = cfg.who;
+    el.evTitle.textContent = cfg.title;
+    el.evText.innerHTML = cfg.text;
+    el.evBtns.replaceChildren();
+    for (const o of cfg.options) {
+      const b = document.createElement('button');
+      b.innerHTML = o.label + (o.hint ? '<small>' + o.hint + '</small>' : '');
+      b.disabled = !!o.disabled;
+      b.addEventListener('click', () => {
+        el.event.classList.add('hide');
+        if (o.fn) o.fn();
+        saveWallet();
+        refreshWallet();
+        renderTables();
+      });
+      el.evBtns.appendChild(b);
+    }
+    el.event.classList.remove('hide');
+  }
+
+  function maybeCollect() {
+    if (W.cd > 0) { W.cd--; saveWallet(); return false; }
+    if (W.shark < 6000) return false;
+    const heat = clamp((W.shark - 6000) / 16000, 0, 1);
+    if (rnd() > 0.3 + heat * 0.45) return false;
+    W.cd = 3;
+    W.tx.unshift({
+      t: Date.now(), label: '刀疤强 · 上门', amt: 0,
+      bal: Math.round(W.cash), note: '欠款 ¥' + NN(W.shark)
+    });
+    showEvent({
+      who: '刀疤强 · 高利贷',
+      title: '上门收数',
+      text: '“兄弟，你欠我 ' + NN(W.shark) + ' 块。' +
+        (W.shark > 15000 ? '利滚利到这份上，你自己心里有数。' : '别让我再跑一趟。') + '”',
+      options: [
+        {
+          label: '先还这个数：¥5,000',
+          hint: W.cash >= 5000 ? '现金 ¥' + NN(W.cash) : '现金只剩 ¥' + NN(W.cash) + '，凑不出来',
+          disabled: W.cash < 5000,
+          fn: () => {
+            repay('shark', 5000);
+            logLine('当场还了刀疤强 5,000，他哼了一声走了', 'hl');
+          }
+        },
+        {
+          label: '再宽限几天',
+          hint: '罚息 ¥2,000 直接滚进本金',
+          fn: () => {
+            W.shark += 2000;
+            W.tx.unshift({
+              t: Date.now(), label: '刀疤强 · 宽限罚息', amt: 0,
+              bal: Math.round(W.cash), note: '欠款 +2,000'
+            });
+            logLine('刀疤强在小本子上又添了 2,000', 'hl');
+          }
+        },
+        {
+          label: '拿下一场的赢利抵',
+          hint: '下一场赢的钱 40% 归他，输了他不管',
+          fn: () => {
+            W.cut = 0.4;
+            logLine('你按了手印：下一场赢利 40% 归刀疤强', 'hl');
+          }
+        }
+      ]
+    });
+    return true;
+  }
+
+
+  function beginLive() {
+    G.live = {
+      t: Date.now(), mode: G.seats, table: selTable, buyin: START,
+      hands: 0, peak: START, stack: START
+    };
+    saveLive();
+  }
+
+  function saveLive() {
+    try {
+      if (!G.live) { localStorage.removeItem(LIVE_KEY); return; }
+      G.live.stack = P[0] ? P[0].stack : G.live.stack;
+      localStorage.setItem(LIVE_KEY, JSON.stringify(G.live));
+    } catch (e) {}
+  }
+
+  function settleSession(L, finalStack) {
+    try { localStorage.removeItem(LIVE_KEY); } catch (e) {}
+    if (!L) { G.live = null; return null; }
+    const tbl = TABLES[L.table] || TABLES[0];
+    const got = Math.max(0, Math.round(finalStack || 0));
+    const lvlBefore = levelIndex(W.cash);
+    addTx('离场 · ' + tbl.name + (L.hands ? ' · ' + L.hands + ' 手' : ''), got);
+    const net = got - L.buyin;
+
+    // 分成条子：赢的钱先给刀疤强抽一笔抵债
+    if (W.cut > 0) {
+      if (net > 0) {
+        const cut = Math.round(net * W.cut);
+        if (cut > 0) {
+          W.cash -= cut;
+          W.shark = Math.max(0, W.shark - cut);
+          W.tx.unshift({
+            t: Date.now(), label: '刀疤强 · 抽成 40%', amt: -cut,
+            bal: Math.round(W.cash), note: '抵债'
+          });
+          logLine('刀疤强抽走 ' + NN(cut) + ' 元赢利抵债', 'hl');
+        }
+      } else {
+        logLine('这手没赢，刀疤强一分没拿到，但他不在乎', 'hl');
+      }
+      W.cut = 0;
+    }
+
+    if (L.hands >= 2) {
+      W.stats.games++;
+      W.stats.net += net;
+      W.stats.hands += L.hands;
+      if (net > 0) W.stats.wins++;
+      if (net > W.stats.best) W.stats.best = net;
+      W.streak = net > 0 ? (W.streak || 0) + 1 : 0;
+      if (W.streak === 3) logLine('三连胜，桌边开始有人看你', 'hl');
+      if (W.streak === 5) logLine('五连胜，赌场经理亲自给你倒酒', 'hl');
+      chargeInterest();
+      if (checkExecution()) return;
+    }
+
+    const lvlAfter = levelIndex(W.cash);
+    if (lvlAfter > lvlBefore) {
+      logLine('赌场等级提升：' + LEVELS[lvlAfter] + ' · 可以进 ' + TABLES[lvlAfter].name + ' 了', 'hl');
+    }
+    checkAch({ net, buyin: L.buyin, swept: !!lastSwept });
+    lastSwept = false;
+    saveWallet();
+    refreshWallet();
+    G.live = null;
+    return { net, hands: L.hands, table: L.table, got };
+  }
+
+  function finalizeCurrent() {
+    if (!G.live) return null;
+    const rec = settleSession(G.live, P[0] ? P[0].stack : 0);
+    if (rec) {
+      logLine('离场结算 ' + (rec.net >= 0 ? '+' : '') + NN(rec.net) + ' 元 · 现金 ¥' + NN(W.cash), 'hl');
+      if (debtTotal() > 0) logLine('仍欠 ' + NN(debtTotal()) + ' 元', 'hl');
+    }
+    return rec;
+  }
+
+  function recoverLive() {
+    try {
+      const raw = localStorage.getItem(LIVE_KEY);
+      if (!raw) return;
+      const L = JSON.parse(raw);
+      localStorage.removeItem(LIVE_KEY);
+      if (L && L.hands >= 1) {
+        const rec = settleSession(L, L.stack || 0);
+        if (rec) logLine('上次未结算的场次已补记：' + (rec.net >= 0 ? '+' : '') + NN(rec.net) + ' 元', 'hl');
+      }
+    } catch (e) {}
+  }
+
+  const CN_NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  function cnNum(n) { return n <= 10 ? CN_NUM[n] : String(n); }
+  function lifeNo() { return W.life || 1; }
+  function peakOf() { return Math.max(W.peakCash || 0, W.cash); }
+
+  function genSelfName() {
+    return SURNAME[(rnd() * SURNAME.length) | 0] + GIVEN[(rnd() * GIVEN.length) | 0];
+  }
+
+  function deathCause(w) {
+    const peak = Math.max(w.peakCash || 0, w.cash);
+    const debt = (w.bank || 0) + (w.shark || 0);
+    const pick = (a) => a[(rnd() * a.length) | 0];
+    if (w.executed) {
+      return pick([
+        '债主上门，他没能走出那栋楼。',
+        '欠条还清了——用他自己的命。',
+        '凌晨三点，他被人从江里捞上来，口袋里还有一张牌。'
+      ]);
+    }
+    if (debt > 0 && w.cash < 500) {
+      return pick([
+        '高利贷的人找上门。第二天，江边多了一具没人认领的尸体。',
+        '欠条压过了命。他从天台跳了下去，手里还攥着最后一张牌。'
+      ]);
+    }
+    if (w.cash < 500) {
+      if (peak >= 1e7) {
+        return pick([
+          '从千万的位置一路输到两百块。他在天台上坐了一夜，天亮时没有下来。',
+          '他把自己关在出租屋里三天，第四天门被撞开时，桌上摊着一副没打完的牌。'
+        ]);
+      }
+      return pick([
+        '输光最后一枚筹码，他走出赌场，再没回来过。',
+        '凌晨从后门离开，此后再没有人见过他。'
+      ]);
+    }
+    return pick([
+      '他带着钱离开了这座城市，再没碰过牌。',
+      '他收手了。至少这一次看起来像是收手了。'
+    ]);
+  }
+  function epitaphOf(w) {
+    const p = Math.max(w.peakCash || 0, w.cash);
+    if (p >= 1e8) return '一代传说';
+    if (p >= 1e7) return '豪赌枭雄';
+    if (p >= 1e6) return '百万赌徒';
+    if (p >= 1e5) return '牌桌浪人';
+    if (p >= 1e4) return '赌场过客';
+    return '落魄之魂';
+  }
+
+  function flavorLine() {
+    const p = peakOf();
+    const f = W.cash;
+    if (p >= 1e7 && f < 3000) return '你曾让整层楼安静下来看你翻牌，最后连散台的底注都摸不出来。';
+    if (p >= 1e7) return '你在顶楼坐过。那里的灯、那里的安静、没人敢大声说话的样子，你都记得。';
+    if (f >= 1e7) return '你揣着一身钱离开牌桌，可赌场从不会真的放人走。';
+    if (f < 500) return '口袋比脸还干净，连翻本的筹码都得靠别人施舍。';
+    if (p >= 1e5) return '不算白来一趟，但离你想要的还差得远。';
+    return '牌桌还在，人换了一轮又一轮。';
+  }
+
+  function openRebirth() {
+    el.rbLife.textContent = '第 ' + cnNum(lifeNo()) + ' 世 · 终';
+    el.rbTitle.textContent = epitaphOf(W);
+    pendingDeath = deathCause(W);
+    el.rbLine.innerHTML = flavorLine() + '<span class="rbdeath">' + pendingDeath + '</span>';
+    el.rbPeak.textContent = '¥' + NN(peakOf());
+    el.rbFinal.textContent = '¥' + NN(W.cash);
+    const net = (W.stats && W.stats.net) || 0;
+    el.rbNet.textContent = (net >= 0 ? '+' : '-') + '¥' + NN(Math.abs(net));
+    el.rbHands.textContent = ((W.stats && W.stats.hands) || 0) + ' / ' + ((W.stats && W.stats.games) || 0);
+    el.rbFill.style.width = '0%';
+    el.rbTxt.textContent = '长按 2 秒 · 重获新生';
+    el.rebirth.classList.add('on');
+  }
+
+  let pendingDeath = '';
+
+  function doReincarnate() {
+    const prev = lifeNo();
+    const rec = {
+      n: prev, name: W.selfName || genSelfName(),
+      epitaph: epitaphOf(W), peak: peakOf(), final: W.cash,
+      peakRank: W.peakRank || 0,
+      death: pendingDeath || deathCause(W),
+      net: (W.stats && W.stats.net) || 0,
+      hands: (W.stats && W.stats.hands) || 0,
+      games: (W.stats && W.stats.games) || 0,
+      best: (W.stats && W.stats.best) || 0,
+      at: Date.now()
+    };
+    const lives = Array.isArray(W.lives) ? W.lives.slice() : [];
+    lives.push(rec);
+    const ach = Array.isArray(W.ach) ? W.ach.slice() : [];
+    W = {
+      cash: 2000, bank: 0, shark: 0, peakCash: 2000, cut: 0, cd: 0,
+      peakDebt: 0, streak: 0, ach, lives, life: prev + 1,
+      selfName: genSelfName(), peakRank: 0,
+      tx: [], stats: { games: 0, wins: 0, net: 0, hands: 0, best: 0 }
+    };
+    W.tx.push({
+      t: Date.now(), label: '第 ' + cnNum(prev + 1) + ' 世 · 你又是两手空空',
+      amt: 2000, bal: 2000, note: ''
+    });
+    saveWallet();
+    selTable = 0;
+    refreshWallet();
+    renderWallet();
+    renderTables();
+    el.rebirth.classList.remove('on');
+    toast('第 ' + cnNum(prev + 1) + ' 世 · ' + W.selfName, '兜里又是 ¥2,000', 'good');
+  }
+  function refreshWallet() {
+    if (W.cash > (W.peakCash || 0)) W.peakCash = W.cash;
+    if (equityNow() > (W.peakEquity || 0)) W.peakEquity = equityNow();
+    if (el.lifeTag) el.lifeTag.textContent = '第 ' + cnNum(lifeNo()) + ' 世 · ' + (W.selfName || '无名');
+    if (el.ovBoard) {
+      const wr = worldRank(W.cash);
+      el.ovBoard.textContent = '资产排行 · 第 ' + wr.rank.toLocaleString('en-US') + ' / ' + wr.total.toLocaleString('en-US') + ' 名';
+    }
+    {
+      const rr = worldRank(W.cash).rank;
+      if (!W.peakRank || rr < W.peakRank) W.peakRank = rr;
+      if (el.btnCast) el.btnCast.textContent = '牌桌 · 第' + rr + ' 名';
+    }
+    if (el.modeSel) syncModeBtns();
+    if (el.ovLife) {
+      el.ovLife.textContent = '第 ' + cnNum(lifeNo()) + ' 世 · ' + (W.selfName || '无名');
+      el.ovLife.classList.toggle('hide', lifeNo() <= 1);
+    }
+    if (el.brokeLine) el.brokeLine.classList.toggle('hide', W.cash >= TABLES[0].minCash);
+    const lvl = levelIndex(W.cash);
+    const dt = debtTotal();
+    if (dt > (W.peakDebt || 0)) { W.peakDebt = dt; }
+    el.cashTxt.textContent = '¥' + NN(W.cash);
+    el.cashBig.textContent = '¥' + NN(W.cash);
+    el.lvlBadge.textContent = LEVELS[lvl];
+    el.debtLine.textContent = dt > 0
+      ? '欠款 ¥' + NN(dt) + '（银行 ' + NN(W.bank) + ' · 高利贷 ' + NN(W.shark) + '）'
+      : '无欠款';
+    el.debtLine.classList.toggle('warn', dt > 0);
+    el.ovRankName.textContent = '¥' + NN(W.cash);
+    el.ovRankPt.textContent = LEVELS[lvl] + (dt > 0 ? ' · 欠 ¥' + NN(dt) : '');
+  }
+
+  function fmtTime(ts) {
+    const d = new Date(ts);
+    const p2 = (n) => (n < 10 ? '0' + n : '' + n);
+    return (d.getMonth() + 1) + '/' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+
+  function renderTables() {
+    el.tableSel.innerHTML = '';
+    TABLES.forEach((t, i) => {
+      const ok = W.cash >= t.minCash;
+      const b = document.createElement('button');
+      b.className = 'tchip' + (i === selTable ? ' on' : '') + (ok ? '' : ' locked');
+      b.innerHTML = '<b>' + t.sb + ' / ' + t.bb + '</b>' +
+        '<i>' + t.name + ' · 买入 ¥' + NN(t.buyin) + '</i>' +
+        (ok ? '' : '<em>需 ¥' + NN(t.minCash) + '</em>');
+      if (ok) {
+        b.addEventListener('click', () => {
+          selTable = i;
+          renderTables();
+          refreshWallet();
+        });
+      }
+      el.tableSel.appendChild(b);
+    });
+    const cur = TABLES[selTable];
+    const can = W.cash >= cur.minCash;
+    el.ovBtn.disabled = false;
+    el.ovBtn.textContent = can ? '入座 · ' + cur.name : '现金不足 · 去借钱';
+    el.tableTxt.textContent = cur.name;
+    refreshWallet();
+  }
+
+  /* ---------- 千人大榜：确定性生成的无名赌客 ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function worthOfById(id) {
+    const c = allCast().find((x) => x.id === id);
+    if (!c) return 0;
+    const v = W.castW && W.castW[id];
+    return typeof v === 'number' ? v : c.w;
+  }
+  function worthOf(c) {
+    if (!c) return 0;
+    if (!c.id) return c.w || 0;
+    const v = W.castW && W.castW[c.id];
+    if (typeof v === 'number') return v;
+    const named = allCast().find((x) => x.id === c.id);
+    return named ? named.w : (c.w || 0);
+  }
+  function setWorth(id, v) {
+    if (!W.castW) W.castW = {};
+    W.castW[id] = Math.max(1000, Math.round(v));
+  }
+
+  const SURNAME = ['王', '李', '张', '刘', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '马', '朱', '胡', '郭', '何', '高', '林', '罗', '梁', '宋', '郑', '谢'];
+  const GIVEN = ['强', '军', '磊', '洋', '勇', '杰', '涛', '明', '超', '刚', '辉', '鹏', '斌', '波', '伟', '亮', '峰', '宇', '浩', '旭', '健', '宁', '坤', '洋'];
+
+  const NOBODY_BG = [
+    '在{厅}出没好些年了，没人记得他第一次来是什么时候。',
+    '靠{厅}这张桌子活着，赢了请客，输了借钱。',
+    '话不多，牌也不多，但总能坐在{厅}的最后一张椅子上。',
+    '听说他早年在更大的场子输过一次，之后就在{厅}安顿下来。',
+    '每次来都带同一个旧钱包，里面塞满了欠条。',
+    '在{厅}买了固定的座位，风雨无阻。'
+  ];
+
+  function tierOfWorth(w) {
+    let k = 0;
+    for (let i = 0; i < TABLES.length; i++) if (w >= TABLES[i].minCash) k = i;
+    return k;
+  }
+
+  function findPerson(id) {
+    const c = allCast().find((x) => x.id === id);
+    if (c) return c;
+    const e = worldList().find((x) => x.id === id);
+    return e || null;
+  }
+  let WORLD = null;
+  function worldList() {
+    if (WORLD) return WORLD;
+    if (!W.worldSeed) W.worldSeed = (Math.random() * 1e9) | 0;
+    const rng = mulberry32(W.worldSeed);
+    const out = [];
+    for (const c of allCast()) out.push({ id: c.id, n: c.n, pt: c.pt, w: c.w, named: 1 });
+    for (let i = 0; i < 1230; i++) {
+      const n = SURNAME[(rng() * SURNAME.length) | 0] + GIVEN[(rng() * GIVEN.length) | 0];
+      const w = Math.round(500 * Math.pow(10, rng() * 4.3));
+      const pt = NOBODY_PT[(rng() * NOBODY_PT.length) | 0];
+      const blank = NOBODY_BG[(rng() * NOBODY_BG.length) | 0];
+      out.push({
+        id: 'w' + i, n, pt, w, named: 0,
+        av: NOBODY_AV[(rng() * NOBODY_AV.length) | 0],
+        tag: pt === '老手' ? '紧凶' : pt === '犹豫' ? '紧弱' : pt === '上头' ? '松凶' : '跟注站',
+        aggr: 0.65 + rng() * 0.85, tight: 0.75 + rng() * 0.6, bluff: 0.5 + rng() * 1.0,
+        bg: blank.split('{厅}').join(TABLES[tierOfWorth(w)].name)
+      });
+    }
+    WORLD = out;
+    return out;
+  }
+
+  function worldRank(cash) {
+    const list = worldList();
+    let better = 0;
+    for (const e of list) {
+      const w = e.named ? worthOfById(e.id) : e.w;
+      if (w > cash) better++;
+    }
+    return { rank: better + 1, total: list.length + 1 };
+  }
+
+  function worldSorted() {
+    const list = worldList().map((e) => ({ id: e.id, n: e.n, pt: e.pt, w: e.named ? worthOfById(e.id) : e.w, named: e.named }));
+    list.push({ n: '你', pt: '赌客', w: W.cash, you: 1 });
+    list.sort((a, b) => b.w - a.w);
+    return list;
+  }
+
+  /* ---------- 入座的人：底层全是生面孔，中高层轮换 ---------- */
+  const NOBODY_PT = ['急躁', '犹豫', '上头', '闷葫芦', '爱吹牛', '紧张', '老手', '愣头青'];
+  const NOBODY_AV = ['🧑', '👨', '🧔', '👦', '🧓', '👴'];
+
+  function randomNobody(tier) {
+    const rng = rnd;
+    const n = SURNAME[(rng() * SURNAME.length) | 0] + GIVEN[(rng() * GIVEN.length) | 0];
+    const pt = NOBODY_PT[(rng() * NOBODY_PT.length) | 0];
+    const base = Math.max(3000, TABLES[tier].minCash * 2);
+    const w = Math.round(base * (0.4 + rng() * 6));
+    return {
+      id: '', n, av: NOBODY_AV[(rng() * NOBODY_AV.length) | 0],
+      tag: pt === '老手' ? '紧凶' : pt === '犹豫' ? '紧弱' : pt === '上头' ? '松凶' : '跟注站',
+      pt, w, aggr: 0.65 + rng() * 0.85, tight: 0.75 + rng() * 0.6, bluff: 0.5 + rng() * 1.0,
+      bg: '', q: [], nobody: 1
+    };
+  }
+
+  function seatedCast(tier, n) {
+    const tbl = TABLES[tier];
+    const lo = tbl.buyin * 2;
+    const hi = tbl.buyin * 400;
+    const pool = worldList()
+      .filter((e) => !e.named && e.w >= lo && e.w <= hi)
+      .sort(() => rnd() - 0.5);
+    const out = [];
+    if (tier >= 3) {
+      const named = castOf(tier).slice().sort(() => rnd() - 0.5);
+      const cnt = Math.min(named.length, 1 + ((rnd() * 2) | 0));
+      for (let i = 0; i < cnt && i < n; i++) out.push(named[i]);
+    }
+    let k = 0;
+    while (out.length < n) {
+      const e = pool[k++];
+      if (!e) { out.push(randomNobody(tier)); continue; }
+      out.push({
+        id: e.id, n: e.n, av: e.av, pt: e.pt, tag: e.tag, w: e.w,
+        aggr: e.aggr, tight: e.tight, bluff: e.bluff, bg: e.bg, q: [], nobody: 1
+      });
+    }
+    return out;
+  }
+
+  function pushStory(id, text) {
+    if (!Array.isArray(W.stories)) W.stories = [];
+    W.stories.unshift({ t: Date.now(), id, text });
+    W.stories = W.stories.slice(0, 40);
+  }
+
+  function agoStr(t) {
+    const d = (Date.now() - t) / 1000;
+    if (d < 120) return '刚刚';
+    if (d < 3600) return Math.floor(d / 60) + ' 分钟前';
+    if (d < 86400) return Math.floor(d / 3600) + ' 小时前';
+    return Math.floor(d / 86400) + ' 天前';
+  }
+
+  function tableStory(delta) {
+    if (!G.live) return;
+    const tbl = TABLES[selTable];
+    const amt = Math.abs(delta);
+    if (amt < tbl.buyin * 0.35) return;
+    let text = '';
+    if (delta < 0) {
+      const w = G.lastWinner;
+      if (!w || w.you || !w.cid) return;
+      text = w.name + ' 在' + tbl.name + '从你手里收了 ¥' + NN(amt);
+    } else if (delta > 0) {
+      const vs = P.filter((p) => !p.you && p.cid);
+      if (!vs.length) return;
+      const v = vs[(rnd() * vs.length) | 0];
+      text = v.name + ' 在' + tbl.name + '被你收走 ¥' + NN(amt);
+    }
+    if (!text) return;
+    if (!Array.isArray(W.feed)) W.feed = [];
+    W.feed.unshift({ t: Date.now(), text });
+    W.feed = W.feed.slice(0, 30);
+  }
+
+  const QUIRKS = [
+    '好几天没在牌桌上露面了。',
+    '换了块新表，据说是赢来的。',
+    '在包厢里连坐了两夜，没合眼。',
+    '最近出手越来越小，像是在攒什么。',
+    '输光之后在门口抽了半包烟。',
+    '带了个生面孔来，说是徒弟。',
+    '把筹码换成现金，说要去趟澳门。',
+    '跟人吵了一架，之后再没坐过那张桌。',
+    '开始只喝白开水，说牌要清醒着打。'
+  ];
+  function maybeQuirk() {
+    if (rnd() > 0.3) return;
+    const pool = allCast();
+    const c = pool[(rnd() * pool.length) | 0];
+    pushStory(c.id, QUIRKS[(rnd() * QUIRKS.length) | 0]);
+  }
+  /* ---------- 身家涨跌 + 江湖传闻 ---------- */
+  function maybeCastDrift() {
+    if (rnd() > 0.32) return;
+    const pool = allCast();
+    const c = pool[(rnd() * pool.length) | 0];
+    const cur = worthOf(c);
+    const r0 = rankOfWorth(cur);
+    const roll = rnd();
+    let mult, text;
+    if (roll < 0.45) {
+      mult = 0.15 + rnd() * 0.45;
+      text = c.n + ' 连着几晚没睡，身家缩水到 ¥' + NN(Math.max(1000, Math.round(cur * mult)));
+    } else if (roll < 0.86) {
+      mult = 1.5 + rnd() * 2.5;
+      text = c.n + ' 手气来了，身家涨到 ¥' + NN(Math.round(cur * mult));
+    } else {
+      mult = 6 + rnd() * 20;
+      text = c.n + ' 一夜暴富，身家冲到 ¥' + NN(Math.round(cur * mult));
+    }
+    setWorth(c.id, cur * mult);
+    const r1 = rankOfWorth(worthOf(c));
+    pushStory(c.id, text);
+    W.stories[0].dr = r0 - r1;
+    saveWallet();
+  }
+  function allCast() {
+    const out = [];
+    for (const tier of CAST) for (const c of tier) out.push(c);
+    return out;
+  }
+
+  function rankInfo() {
+    const list = allCast().slice().sort((a, b) => b.w - a.w);
+    let rank = 1;
+    for (const c of list) if (c.w > W.cash) rank++;
+    return { rank, total: list.length + 1, list };
+  }
+
+  function rankOfWorth(w) {
+    const list = worldList();
+    let better = 0;
+    for (const e of list) {
+      const v = e.named ? worthOfById(e.id) : e.w;
+      if (v > w) better++;
+    }
+    return better + 1;
+  }
+
+  let castScroll = 0;
+  function renderLifeDetail(n) {
+    const l = (W.lives || []).find((x) => x.n === n);
+    if (!l) { renderCast(); return; }
+    let html = '<button class="ghost backbtn" id="castBack">‹ 返回</button>';
+    html += '<div class="cdetail"><span class="cav">🕯️</span><div><b>' + (l.name || '无名') + '</b>' +
+      '<div class="cw">第 ' + cnNum(l.n) + ' 世 · ' + l.epitaph + '</div></div></div>';
+    html += '<div class="cgrid">' +
+      '<div><i>巅峰资产</i><b>¥' + NN(l.peak) + '</b></div>' +
+      '<div><i>巅峰排名</i><b>第 ' + (l.peakRank || '—') + ' 名</b></div>' +
+      '<div><i>场次 / 手牌</i><b>' + (l.games || 0) + ' / ' + (l.hands || 0) + '</b></div>' +
+      '<div><i>终局现金</i><b>¥' + NN(l.final) + '</b></div>' +
+      '</div>';
+    html += '<h5 class="sech">结局</h5><div class="rm">' + (l.death || '死因不明。') + '</div>';
+    el.castBody.innerHTML = html;
+    $('castBack').addEventListener('click', () => {
+      renderCast();
+      el.castBody.scrollTop = castScroll;
+    });
+  }
+  function renderCastDetail(cid) {
+    const c = findPerson(cid);
+    if (!c) { renderCast(); return; }
+    castScroll = el.castBody.scrollTop || 0;
+    const w = worthOf(c);
+    const rank = rankOfWorth(w);
+    const r = (W.rel && W.rel[cid]) || { h: 0, lost: 0 };
+    const loan = (W.loans || []).find((l) => l.cid === cid);
+    const stories = (W.stories || []).filter((s) => s.id === cid).slice(0, 8);
+    let html = '<button class="ghost backbtn" id="castBack">‹ 返回榜单</button>';
+    html += '<div class="cdetail"><div class="cav">' + c.av + '</div><div>' +
+      '<b>' + c.n + '</b> <span class="ctag">' + c.pt + ' · ' + c.tag + '</span>' +
+      '<div class="cw">身家 ¥' + NN(w) + ' · 全服第 ' + rank.toLocaleString('en-US') + ' 名</div></div></div>';
+    html += '<p class="cbg">' + c.bg + '</p>';
+    html += '<div class="cgrid">' +
+      '<div><i>交手</i><b>' + (r.h || 0) + ' 手</b></div>' +
+      '<div><i>你输给他</i><b>¥' + NN(r.lost || 0) + '</b></div>' +
+      '<div><i>交情</i><b>' + affOf(cid) + '</b></div>' +
+      '<div><i>欠你</i><b>' + (loan ? '¥' + NN(loan.amt) : '—') + '</b></div>' +
+      '</div>';
+    if (c.q && c.q.length) {
+      html += '<div class="cquote">口头禅：' + c.q.map((x) => '「' + x + '」').join(' ') + '</div>';
+    }
+    html += '<h5 class="sech">他的近况</h5>';
+    if (!stories.length) {
+      html += '<div class="rm">还没什么风声。</div>';
+    } else {
+      html += '<div class="rumors">';
+      for (const s of stories) {
+        html += '<div class="rm"><span class="rmt">' + agoStr(s.t) + '</span>' + s.text + '</div>';
+      }
+      html += '</div>';
+    }
+    el.castBody.innerHTML = html;
+    $('castBack').addEventListener('click', () => {
+      renderCast();
+      el.castBody.scrollTop = castScroll;
+    });
+  }
+  function renderCast() {
+    const tier = TABLES[selTable];
+    const cast = castOf(selTable);
+    let html = '';
+    if (Array.isArray(W.lives) && W.lives.length) {
+      html += '<h5 class="sech">故人 · 你的前世</h5><div class="lb">';
+      for (let i = W.lives.length - 1; i >= 0; i--) {
+        const l = W.lives[i];
+        html += '<div class="lbr live" data-life="' + l.n + '"><i>†</i><b>' + (l.name || '无名') +
+          '</b><span>' + l.epitaph + ' · 巅峰第 ' + (l.peakRank || '—') + ' 名</span><em>¥' + NN(l.peak) + '</em></div>';
+      }
+      html += '</div>';
+    }
+    if (Array.isArray(W.feed) && W.feed.length) {
+      html += '<h5 class="sech">牌桌消息</h5><div class="rumors">';
+      for (const s of W.feed.slice(0, 8)) {
+        html += '<div class="rm"><span class="rmt">' + agoStr(s.t) + '</span>' + s.text + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '<h5 class="sech">' + tier.name + ' · 这些人</h5>';
+    for (const c of cast) {
+      const r = (W.rel && W.rel[c.id]) || { h: 0, lost: 0 };
+      html += '<div class="ccard"><div class="cav">' + c.av + '</div><div class="cin">' +
+        '<b>' + c.n + '</b><span class="ctag">' + c.pt + ' · ' + c.tag + '</span>' +
+        '<div class="cw">身家 ¥' + NN(worthOf(c)) + '</div>' +
+        '<p>' + c.bg + '</p>' +
+        '<div class="crel">交手 ' + (r.h || 0) + ' 手 · 输给他 ¥' + NN(r.lost || 0) + ' · 交情 ' + affOf(c.id) + '</div>' +
+        '</div></div>';
+    }
+    const all = worldSorted();
+    const myIdx = all.findIndex((x) => x.you);
+    html += '<h5 class="sech">资产排行 · 你第 ' + (myIdx + 1).toLocaleString('en-US') +
+      ' / ' + all.length.toLocaleString('en-US') + ' 名</h5><div class="lb">';
+    const rows = [];
+    for (let i = 0; i < 100 && i < all.length; i++) rows.push({ r: i + 1, e: all[i] });
+    if (myIdx >= 100) rows.push({ r: myIdx + 1, e: all[myIdx] });
+    for (const row of rows) {
+      const e = row.e;
+      const clickable = e.id ? ' data-cid="' + e.id + '"' : '';
+      const liveCls = e.id ? ' live' : '';
+      html += '<div class="lbr' + (e.you ? ' you' : '') + liveCls + '"' + clickable + '><i>' + row.r.toLocaleString('en-US') +
+        '</i><b>' + e.n + '</b><span>' + (e.pt || '') + '</span><em>¥' + NN(e.w) + '</em></div>';
+    }
+    html += '</div>';
+
+
+    if (Array.isArray(W.stories) && W.stories.length) {
+      html += '<h5 class="sech">江湖传闻</h5><div class="rumors">';
+      for (const s of W.stories.slice(0, 6)) {
+        html += '<div class="rm"><span class="rmt">' + agoStr(s.t) + '</span>' + s.text + '</div>';
+      }
+      html += '</div>';
+    }
+    el.castBody.innerHTML = html;
+  }
+
+  function affOf(cid) {
+    if (!W.aff) W.aff = {};
+    if (typeof W.aff[cid] !== 'number') W.aff[cid] = 50;
+    return W.aff[cid];
+  }
+  function bumpAff(cid, d) {
+    if (!W.aff) W.aff = {};
+    W.aff[cid] = Math.max(0, Math.min(100, affOf(cid) + d));
+  }
+
+  function maybeBorrowAsk() {
+    if (selTable < 3 || !G.live) return;
+    if (W.cash < 200) return;
+    if (W.askCd && Date.now() - W.askCd < 3600e3) return;
+    if (!Array.isArray(W.loans)) W.loans = [];
+    const broke = P.filter((p) => !p.you && p.cid && p.stack <= 0);
+    if (!broke.length || rnd() > 0.55) return;
+    const p = broke[(rnd() * broke.length) | 0];
+    const c = findPerson(p.cid);
+    if (!c || W.loans.some((l) => l.cid === c.id)) return;
+    const tier = TABLES[selTable];
+    let amt = Math.round(tier.buyin * 0.3 / 100) * 100;
+    amt = Math.min(amt, Math.max(100, Math.floor(W.cash * 0.5)));
+    if (amt < 100) return;
+    const tip = Math.max(100, Math.round(amt * 0.1 / 100) * 100);
+    W.askCd = Date.now();
+    const line = c.kind
+      ? '「我知道我没脸开口……借我一点，下个月一定还你。」'
+      : c.pt === '傲' || c.pt === '轻浮' || c.pt === '暴烈'
+        ? '「借我点。别用那种眼神看我，我还没输完。」'
+        : '「就一把，翻本就还你。真的，就一把。」';
+    showEvent({
+      who: c.n + ' · ' + c.pt,
+      title: '他开口了',
+      text: line + '<br><br>他的筹码已经空了，眼睛还盯着牌桌。',
+      options: [
+        {
+          label: '借 ¥' + NN(amt) + '，不收利息',
+          hint: '交情 +14 · 他记你一辈子',
+          onPick: () => {
+            W.cash -= amt;
+            addTx('借出 · ' + c.n, -amt);
+            W.loans.push({ cid: c.id, name: c.n, amt, rate: 0, due: G.handNo + 12, insulted: 0 });
+            bumpAff(c.id, 14);
+            saveWallet(); refreshWallet();
+            toast(c.n, '「谢谢，真的。」', 'good');
+          }
+        },
+        {
+          label: '借 ¥' + NN(amt) + '，收两成利',
+          hint: '交情 +5 · 到期还 ¥' + NN(Math.round(amt * 1.2)),
+          onPick: () => {
+            W.cash -= amt;
+            addTx('借出 · ' + c.n + '（两成利）', -amt);
+            W.loans.push({ cid: c.id, name: c.n, amt, rate: 0.2, due: G.handNo + 12, insulted: 0 });
+            bumpAff(c.id, 5);
+            saveWallet(); refreshWallet();
+            toast(c.n, '「……行，两成。」', 'good');
+          }
+        },
+        {
+          label: '打发 ¥' + NN(tip) + '，让他滚',
+          hint: '羞辱 · 交情 -24',
+          onPick: () => {
+            if (W.cash >= tip) { W.cash -= tip; addTx('打发 · ' + c.n, -tip); }
+            bumpAff(c.id, -24);
+            saveWallet(); refreshWallet();
+            toast(c.n, '他捏着钱看了你三秒，什么也没说。', 'bad');
+          }
+        },
+        {
+          label: '不理他',
+          hint: '交情 -6',
+          onPick: () => {
+            bumpAff(c.id, -6);
+            saveWallet();
+            toast('', '他转身走开了。', 'bad');
+          }
+        }
+      ]
+    });
+  }
+
+  function settleLoans() {
+    if (!Array.isArray(W.loans) || !W.loans.length) return;
+    const due = W.loans.filter((l) => l.due <= G.handNo);
+    if (!due.length) return;
+    for (const l of due) {
+      const aff = affOf(l.cid);
+      const roll = rnd();
+      let pay = 0, msg = '';
+      if (l.insulted) {
+        if (roll < 0.45) { msg = l.name + ' 拿了钱就没再出现。'; bumpAff(l.cid, -18); }
+        else { pay = l.amt; msg = l.name + ' 把钱还了，一句多余的话都没有。'; }
+      } else if (aff >= 65 && roll < 0.5) {
+        pay = Math.round(l.amt * (1 + l.rate) * (1.3 + rnd() * 0.6));
+        msg = l.name + ' 连本带利还了 ¥' + NN(pay) + '，还多给了一些。';
+        bumpAff(l.cid, 6);
+      } else if (roll < 0.78) {
+        pay = Math.round(l.amt * (1 + l.rate));
+        msg = l.name + ' 把 ¥' + NN(pay) + ' 还上了。';
+      } else {
+        msg = l.name + ' 说下个月一定还，然后就没消息了。';
+        bumpAff(l.cid, -28);
+      }
+      if (pay > 0) { W.cash += pay; addTx('收账 · ' + l.name, pay); }
+      toast('收账', msg, pay > 0 ? 'good' : 'bad');
+      logLine(msg, pay > 0 ? 'hl' : 'bot');
+    }
+    W.loans = W.loans.filter((l) => due.indexOf(l) < 0);
+    saveWallet();
+    refreshWallet();
+  }
+  function maybeCastOffer() {
+    const tier = TABLES[selTable];
+    if (W.cash >= tier.minCash) return false;
+    if (W.offerCd && Date.now() - W.offerCd < 6 * 3600e3) return false;
+    const cast = castOf(selTable);
+    for (const c of cast) {
+      const r = relOf(c.id);
+      if (r.lent) continue;
+      if (r.h < 12) continue;
+      if (!c.kind && r.lost < tier.minCash) continue;
+      const amt = Math.min(
+        Math.max(500, Math.round(tier.minCash / 100) * 100),
+        Math.round(c.w * 0.05 / 100) * 100
+      );
+      W.offerCd = Date.now();
+      const line = c.kind
+        ? '「拿去，别在这儿站着。当年我也被人这么拉过一把。」'
+        : '「你在我这儿输得够多了。这点拿去，别输给别人。」';
+      showEvent({
+        who: c.n + ' · ' + c.pt,
+        title: '推过来一叠筹码',
+        text: line + '<br><br>' + c.n + ' 借你 <b>¥' + NN(amt) + '</b>，不用利息，也不用还。' +
+          '他只说了一句：<i>下次别输给那帮人。</i>',
+        options: [
+          {
+            label: '收下 · ¥' + NN(amt),
+            hint: '现金 +' + NN(amt),
+            onPick: () => {
+              r.lent = 1;
+              W.cash += amt;
+              addTx('借入 · ' + c.n + ' 江湖救急', amt);
+              saveWallet();
+              refreshWallet();
+              renderTables();
+              toast(c.n, '「去吧。」', 'good');
+            }
+          },
+          {
+            label: '谢绝',
+            hint: '留着面子',
+            onPick: () => {
+              r.lent = 1;
+              saveWallet();
+              toast(c.n, '「随你。」', 'bad');
+            }
+          }
+        ]
+      });
+      return true;
+    }
+    return false;
+  }
+  function renderWallet() {
+    const lvl = levelIndex(W.cash);
+    const S = W.stats;
+    const winRate = S.games ? Math.round(S.wins / S.games * 100) : 0;
+    const sg = (v) => (v > 0 ? '+' : '');
+    const dis = (v) => (v ? ' disabled' : '');
+
+    const loanCard = (kind, title, cur, cap, rate) => {
+      const unit = Math.max(1000, Math.round(cap / 10 / 1000) * 1000);
+      return '<div class="wcard"><div class="wt"><b>' + title + '</b>' +
+        '<span>额度 ¥' + NN(cap) + ' · 每场利息 ' + Math.round(rate * 100) + '%</span></div>' +
+        '<div class="wamt' + (cur > 0 ? ' red' : '') + '">¥' + NN(cur) + '</div>' +
+        '<div class="wbtns">' +
+          '<button data-act="borrow" data-kind="' + kind + '" data-amt="' + unit + '"' + dis(cur >= cap) + '>借 ' + NN(unit) + '</button>' +
+          '<button data-act="borrow" data-kind="' + kind + '" data-amt="' + (cap - cur) + '"' + dis(cur >= cap) + '>借满</button>' +
+          '<button data-act="repay" data-kind="' + kind + '" data-amt="' + unit + '"' + dis(cur <= 0) + '>还 ' + NN(unit) + '</button>' +
+          '<button data-act="repay" data-kind="' + kind + '" data-amt="99999999999"' + dis(cur <= 0) + '>还清</button>' +
+        '</div></div>';
+    };
+
+    let html = '';
+    const eq = equityNow();
+    const line = killLine();
+    let risk = '';
+    if (debtTotal() > 0) {
+      if (debtTotal() > line * 0.75) risk = 'danger';
+      else if (debtTotal() > line * 0.4) risk = 'warn';
+      else risk = 'safe';
+    }
+    html += '<div class="wcard"><div class="wt"><b>现金</b><span>' + LEVELS[lvl] +
+      (debtTotal() > 0 ? ' · 欠 ¥' + NN(debtTotal()) : '') + '</span></div>' +
+      '<div class="wamt">¥' + NN(W.cash) + '</div>' +
+      '<div class="wline"><span>净资产 ¥' + NN(eq) + '</span>' +
+      (risk ? '<span class="risk ' + risk + '">清算线 ¥' + NN(line) + '</span>' : '') + '</div>' +
+      (risk === 'danger' ? '<div class="wrisk">再借下去，债主会来找你。</div>' : '') +
+      '</div>';
+
+    const room = Math.max(0, killLine() - debtTotal());
+    html += loanCard('bank', '银行贷款', W.bank, Math.min(bankCap(), W.bank + room), bankRate());
+    html += loanCard('shark', '高利贷', W.shark, Math.min(sharkCap(), W.shark + room), sharkRate());
+
+    if (W.cut > 0) {
+      html += '<div class="wcard" style="border-color:rgba(255,90,110,.35)">' +
+        '<div class="wt"><b style="color:#ffb3c0">分成条子生效中</b><span>刀疤强</span></div>' +
+        '<div style="font-size:11.5px;color:#c9b3b7;line-height:1.8">' +
+        '下一场赢利的 <b style="color:#ff9db0">40%</b> 会直接拿去抵高利贷；输了不算。</div></div>';
+    }
+
+    html += '<div class="statgrid">' +
+      '<div><i>场次</i><b>' + S.games + '</b></div>' +
+      '<div><i>胜率</i><b>' + winRate + '%</b></div>' +
+      '<div><i>累计盈亏</i><b class="' + (S.net >= 0 ? 'up' : 'down') + '">' + sg(S.net) + NN(S.net) + '</b></div>' +
+      '<div><i>最佳单场</i><b class="up">' + sg(S.best) + NN(S.best) + '</b></div>' +
+      '</div>';
+
+    html += '<h5 class="sech">成就 ' + W.ach.length + ' / ' + ACHS.length +
+      (W.streak >= 2 ? '　·　当前 ' + W.streak + ' 连胜' : '') + '</h5><div class="achs">';
+    for (const a of ACHS) {
+      const got = W.ach.indexOf(a.id) >= 0;
+      html += '<div class="ach' + (got ? ' got' : '') + '"><b>' + (got ? '★' : '☆') + ' ' + a.name +
+        '</b><i>' + a.desc + '</i></div>';
+    }
+    html += '</div>';
+
+    html += '<h5 class="sech">流水</h5>';
+    if (!W.tx.length) {
+      html += '<div class="empty">还没有任何记录。</div>';
+    } else {
+      for (const x of W.tx.slice(0, 60)) {
+        const cls = x.amt > 0 ? 'up' : x.amt < 0 ? 'down' : 'even';
+        html += '<div class="txrow"><div class="tl">' + x.label +
+          '<i>' + fmtTime(x.t) + (x.note ? ' · ' + x.note : '') + ' · 余额 ¥' + NN(x.bal) + '</i></div>' +
+          '<div class="ta ' + cls + '">' + sg(x.amt) + NN(x.amt) + '</div></div>';
+      }
+    }
+
+    const lives = Array.isArray(W.lives) ? W.lives : [];
+    const bestPeak = Math.max(peakOf(), ...lives.map((l) => l.peak || 0), 0);
+    html += '<h5 class="sech">轮回</h5>' +
+      '<div class="wcard"><div class="wt"><b>第 ' + cnNum(lifeNo()) + ' 世 · ' + (W.selfName || '无名') + '</b>' +
+      '<span>生涯最高 ¥' + NN(bestPeak) + '</span></div>' +
+      '<div class="wbtns"><button class="danger" data-act="rebirth">结束这一世 · 重开</button></div></div>';
+
+    if (lives.length) {
+      html += '<h5 class="sech">历代</h5><div class="lives">';
+      for (let i = lives.length - 1; i >= 0; i--) {
+        const l = lives[i];
+        html += '<div class="lrow"><b>第 ' + cnNum(l.n) + ' 世 · ' + (l.name || '无名') + '</b><i>' + l.epitaph + '</i>' +
+          '<span>巅峰 ¥' + NN(l.peak) + ' · 第 ' + (l.peakRank || '—') + ' 名</span></div>';
+      }
+      html += '</div>';
+    }
+
+    el.boardBody.innerHTML = html;
+  }
+
+  function makePlayer(idx, cfg) {
+    return {
+      i: idx, name: cfg.n, av: cfg.av, you: !!cfg.you,
+      style: { aggr: cfg.aggr || 1, tight: cfg.tight || 1, bluff: cfg.bluff || 1 },
+      tag: cfg.tag || '', cid: cfg.id || '', pt: cfg.pt || '', w: cfg.w || 0,
+      bg: cfg.bg || '', q: cfg.q || [],
+      stack: START, hole: [], committed: 0, total: 0,
+      folded: false, allin: false, acted: false, out: false, lastAct: ''
+    };
+  }
+
+  /* ============================================================
+     DOM
+     ============================================================ */
+  const el = {
+    seats: $('seats'), pot: $('pot'), board: $('board'), stage: $('stageLab'),
+    handNo: $('handNo'), tableTxt: $('tableTxt'), toast: $('toast'),
+    log: $('log'), readout: $('readout'), eqBar: $('eqBar'), eqTxt: $('eqTxt'),
+    bar: $('bar'), betctrl: $('betctrl'), slider: $('slider'), amt: $('amt'),
+    btnFold: $('btnFold'), btnCall: $('btnCall'), btnRaise: $('btnRaise'),
+    hint: $('hint'), overlay: $('overlay'), ovBtn: $('ovBtn'), ovMusic: $('ovMusic'),
+    ovTitle: $('ovTitle'), ovSub: $('ovSub'), ovText: $('ovText'),
+    fan: $('fan'), btnMusic: $('btnMusic'),
+    review: $('review'), revBody: $('revBody'), modeSel: $('modeSel'),
+    tableSel: $('tableSel'), cashTxt: $('cashTxt'), cashBig: $('cashBig'),
+    lvlBadge: $('lvlBadge'), debtLine: $('debtLine'), ovRankIcon: $('ovRankIcon'),
+    ovRankName: $('ovRankName'), ovRankPt: $('ovRankPt'),
+    boardDrawer: $('boardDrawer'), boardBody: $('boardBody'),
+    eqChip: $('eqChip'), eqChipV: $('eqChipV'), eqChipB: $('eqChipB'),
+    event: $('event'), evWho: $('evWho'), evTitle: $('evTitle'), evText: $('evText'), evBtns: $('evBtns'),
+    clockBar: $('clockBar'), clockFill: $('clockFill'),
+    ovBoard: $('ovBoard'),
+    castBody: $('castBody'), castDrawer: $('castDrawer'), btnCast: $('btnCast'),
+    lifeTag: $('lifeTag'), ovLife: $('ovLife'), brokeLine: $('brokeLine'), rebirth: $('rebirth'),
+    rbLife: $('rbLife'), rbTitle: $('rbTitle'), rbLine: $('rbLine'),
+    rbPeak: $('rbPeak'), rbFinal: $('rbFinal'), rbNet: $('rbNet'), rbHands: $('rbHands'),
+    rbFill: $('rbFill'), rbTxt: $('rbTxt'),
+    contbar: $('contbar'), cbTitle: $('cbTitle'), cbAmt: $('cbAmt'),
+    cbSub: $('cbSub'), cbNext: $('cbNext'), cbLeave: $('cbLeave'), cbMin: $('cbMin')
+  };
+
+  const seatEls = [];
+
+  function buildSeats() {
+    el.seats.replaceChildren();
+    seatEls.length = 0;
+    const pos = MODES[G.seats];
+    P.forEach((p, idx) => {
+      const d = document.createElement('div');
+      d.className = 'seat s' + pos[idx];
+      d.innerHTML =
+        '<div class="hand"></div>' +
+        '<div class="tag"></div>' +
+        '<div class="who"><span class="av">' + p.av + '</span>' +
+          '<div><b>' + p.name + '</b><i>0</i></div></div>' +
+        '<div class="dealer">D</div>';
+      el.seats.appendChild(d);
+      seatEls.push({
+        root: d,
+        hand: d.querySelector('.hand'),
+        tag: d.querySelector('.tag'),
+        stack: d.querySelector('.who i'),
+        dealer: d.querySelector('.dealer')
+      });
+    });
+  }
+
+  function buildFan() {
+    const fan = el.fan;
+    if (!fan) return;
+    const cards = [['A', '♠', 0], ['K', '♥', 1], ['Q', '♣', 0], ['J', '♦', 1], ['10', '♠', 0]];
+    const n = cards.length;
+    cards.forEach((c, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'fcWrap';
+      const k = i - (n - 1) / 2;
+      wrap.style.transform = 'translate(-50%,-50%) translate(' + (k * 44) + 'px,' +
+        (Math.abs(k) * 8) + 'px) rotate(' + (k * 9) + 'deg)';
+      const card = document.createElement('div');
+      card.className = 'fc' + (c[2] ? ' red' : '');
+      card.style.animationDelay = (i * 80) + 'ms';
+      card.innerHTML = '<span class="fr">' + c[0] + '</span>' +
+        '<span class="fs">' + c[1] + '</span>' +
+        '<span class="fp">' + c[1] + '</span>';
+      wrap.appendChild(card);
+      fan.appendChild(wrap);
+    });
+  }
+
+  function syncMusic() {
+    const on = !musicMuted;
+    el.ovMusic.textContent = on ? '♪ 音乐：开' : '♪ 音乐：关';
+    el.btnMusic.textContent = on ? '♪ 开' : '♪ 关';
+  }
+
+  function cardSlot(card, up) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    const c = document.createElement('div');
+    c.className = 'card' + (up ? ' up' : '');
+    const r = card >> 2, s = card & 3;
+    const red = s === 1 || s === 3;
+    c.innerHTML =
+      '<div class="face back"></div>' +
+      '<div class="face front' + (red ? ' red' : '') + '">' +
+        '<span class="bigpip">' + SUITS[s] + '</span>' +
+        '<span class="rk">' + RANKS[r] + '</span>' +
+        '<span class="su">' + SUITS[s] + '</span>' +
+      '</div>';
+    slot.appendChild(c);
+    return slot;
+  }
+
+  function logLine(text, cls) {
+    const d = document.createElement('div');
+    d.className = 'line' + (cls ? ' ' + cls : '');
+    d.textContent = text;
+    el.log.appendChild(d);
+    while (el.log.children.length > 90) el.log.firstChild.remove();
+    el.log.scrollTop = el.log.scrollHeight;
+  }
+
+  function toast(main, sub, kind) {
+    el.toast.innerHTML = main + (sub ? '<small>' + sub + '</small>' : '');
+    el.toast.className = 'toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.toast.className = 'toast'; }, 2200);
+  }
+
+  function renderBoard() {
+    const need = G.board.length;
+    while (el.board.children.length > need) el.board.lastChild.remove();
+    for (let i = el.board.children.length; i < need; i++) {
+      el.board.appendChild(cardSlot(G.board[i], true));
+    }
+  }
+
+  function renderSeats() {
+    P.forEach((p, idx) => {
+      const s = seatEls[idx];
+      if (!s) return;
+      s.stack.textContent = NN(p.stack);
+      s.root.classList.toggle('folded', p.folded && !p.out && !G.reveal);
+      s.root.classList.toggle('revealed', !!G.reveal && !p.out && p.hole.length > 0);
+      s.root.classList.toggle('out', p.out);
+      s.dealer.classList.toggle('on', idx === G.dealer && !p.out);
+      s.tag.textContent = p.lastAct || '';
+      s.tag.className = 'tag' + (p.lastAct ? ' on' : '') + (p.lastAct === '弃牌' ? ' fold' : '');
+    });
+    el.pot.textContent = NN(potNow());
+    el.handNo.textContent = '第 ' + Math.max(1, G.handNo) + ' 手';
+  }
+
+  function renderHole() {
+    P.forEach((p, idx) => {
+      const s = seatEls[idx];
+      if (!s) return;
+      s.hand.replaceChildren();
+      if (p.out) return;
+      p.hole.forEach((c, k) => {
+        const sl = cardSlot(c, p.you);
+        sl.style.animationDelay = (k * 70 + idx * 30) + 'ms';
+        s.hand.appendChild(sl);
+      });
+    });
+  }
+
+  function revealAll() {
+    G.reveal = true;
+    P.forEach((p, idx) => {
+      if (p.out) return;
+      const s = seatEls[idx];
+      if (!s || !p.hole.length) return;
+      s.root.classList.remove('folded');
+      s.root.classList.add('revealed');
+      s.hand.querySelectorAll('.card').forEach((c, i) => {
+        setTimeout(() => c.classList.add('up'), i * 90);
+      });
+    });
+  }
+
+  /* ============================================================
+     记录 / 复盘
+     ============================================================ */
+  const hist = [];
+  const STREET_NAMES = ['翻牌前', '翻牌', '转牌', '河牌'];
+  let curHand = null;
+
+  function cardTxt(c) {
+    if (c === undefined || c < 0) return '';
+    const red = (c & 3) === 1 || (c & 3) === 3;
+    return '<span class="rcard ' + (red ? 'red' : 'blk') + '">' + RANKS[c >> 2] + SUITS[c & 3] + '</span>';
+  }
+
+  function startRecord() {
+    curHand = {
+      no: G.handNo, seats: G.seats, acts: [],
+      you: P[0].hole.slice(), board: [],
+      result: '', up: P[0].stack, delta: 0, pot: 0,
+      rig: G.rigApplied || null
+    };
+  }
+
+  function note(p, text) {
+    logLine(p.name + ' ' + text, p.you ? 'you' : 'bot');
+    if (curHand) curHand.acts.push({ st: G.street, p: p.you ? 'you' : 'bot', n: p.name, t: text });
+  }
+
+  function endRecord(result, pot) {
+    if (!curHand) return;
+    curHand.result = result;
+    curHand.delta = P[0].stack - curHand.up;
+    curHand.pot = pot;
+    curHand.board = G.board.slice();
+    hist.unshift(curHand);
+    if (hist.length > 40) hist.pop();
+    curHand = null;
+  }
+
+  function renderReview() {
+    el.revBody.replaceChildren();
+    if (!hist.length) {
+      el.revBody.innerHTML = '<div class="empty">还没有打完的手牌</div>';
+      return;
+    }
+    for (const h of hist) {
+      const item = document.createElement('div');
+      item.className = 'ritem';
+      const cls = h.delta > 0 ? 'up' : h.delta < 0 ? 'down' : 'even';
+      const sign = h.delta > 0 ? '+' : '';
+      const rigTag = h.rig
+        ? '<span class="rigtag">' + (h.rig === 'trap' ? '预置 · 反杀' : '预置 · 爽局') + '</span>'
+        : '';
+      let html = '<div class="rsum"><span>' + MODE_NAME[h.seats] + ' · 第 ' + h.no +
+        ' 手 · 底池 ' + NN(h.pot) + rigTag + '</span>' +
+        '<span class="res ' + cls + '">' + sign + NN(h.delta) + '</span></div>';
+      html += '<div class="rdetail"><i>你的手牌</i>' +
+        cardTxt(h.you[0]) + ' ' + cardTxt(h.you[1]) +
+        (h.board.length ? '　<i class="inl">公共牌</i> ' + h.board.map(cardTxt).join(' ') : '');
+      let lastSt = -1;
+      for (const a of h.acts) {
+        if (a.st !== lastSt) { html += '<i>' + STREET_NAMES[a.st] + '</i>'; lastSt = a.st; }
+        html += '<div class="' + a.p + '">' + a.n + ' ' + a.t + '</div>';
+      }
+      html += '<i>结果</i><div>' + h.result + '</div></div>';
+      item.innerHTML = html;
+      item.addEventListener('click', () => item.classList.toggle('open'));
+      el.revBody.appendChild(item);
+    }
+  }
+
+  /* ============================================================
+     胜率面板 / 对手读取
+     ============================================================ */
+  function updateEquity() {
+    const you = P[0];
+    if (!you || you.hole.length !== 2 || you.folded) {
+      el.eqBar.style.width = '0%';
+      el.eqTxt.textContent = you && you.folded ? '本手已弃牌' : '等待发牌…';
+      if (el.eqChip) el.eqChip.classList.add('hide');
+      return;
+    }
+    const nOpp = Math.max(1, P.filter((q) => q !== you && !q.folded && !q.out).length);
+    const e = equityN(you.hole, G.board, 700, nOpp);
+    const p = Math.round(e * 100);
+    el.eqBar.style.width = p + '%';
+    el.eqBar.style.background = e > 0.6
+      ? 'linear-gradient(90deg,#2fc48c,#9df0c8)'
+      : e > 0.4
+        ? 'linear-gradient(90deg,#c8a34e,#f6e3ae)'
+        : 'linear-gradient(90deg,#b8394f,#ff9fb0)';
+    el.eqTxt.innerHTML = '<b>' + p + '%</b> · 胜率（对 ' + nOpp + ' 个对手的随机手牌）';
+    if (el.eqChip) {
+      el.eqChipV.textContent = p + '%';
+      el.eqChipB.style.width = p + '%';
+      el.eqChipB.style.background = el.eqBar.style.background;
+      el.eqChip.classList.remove('hide');
+    }
+  }
+
+  function foldRate() {
+    const st = G.stats;
+    if (st.betFaced < 5) return 0.45;
+    return st.folded / st.betFaced;
+  }
+
+  function updateReadout() {
+    const st = G.stats;
+    if (st.hands < 3) { el.readout.textContent = '还在看你出牌的习惯…'; return; }
+    const fr = foldRate();
+    const aggr = st.raised / Math.max(1, st.hands);
+    let tip;
+    if (fr > 0.55) tip = '你弃得太勤，他们会开始多诈唬。';
+    else if (fr < 0.22) tip = '你跟得松，他们会少诈唬、多用大注收价值。';
+    else if (aggr > 1.2) tip = '你太爱加注，他们会收紧跟注范围。';
+    else tip = '目前打法均衡，他们还在按标准策略打。';
+    el.readout.innerHTML =
+      '弃牌率 <b>' + Math.round(fr * 100) + '%</b> · 加注 <b>' + aggr.toFixed(1) + '</b> 次/手<br>' + tip;
+  }
+
+  /* ============================================================
+     牌局流程
+     ============================================================ */
+  function resetHand() {
+    G.board = [];
+    G.pot = 0;
+    G.street = 0;
+    G.curBet = 0;
+    G.minRaise = BB;
+    G.rigBoard = null;
+    for (const p of P) {
+      p.hole = [];
+      p.committed = 0;
+      p.total = 0;
+      p.folded = p.stack <= 0;
+      p.out = p.stack <= 0;
+      p.allin = false;
+      p.acted = false;
+      p.lastAct = '';
+    }
+    G.reveal = false;
+  }
+
+  function clearTable() {
+    el.board.replaceChildren();
+    for (const s of seatEls) {
+      if (!s) continue;
+      s.hand.replaceChildren();
+      s.root.classList.remove('dealt', 'winner', 'active', 'revealed');
+    }
+  }
+
+  function nextLive(from) {
+    for (let k = 1; k <= P.length; k++) {
+      const idx = (from + k) % P.length;
+      if (P[idx].stack > 0) return idx;
+    }
+    return -1;
+  }
+
+  function nextToAct(from) {
+    for (let k = 1; k <= P.length; k++) {
+      const idx = (from + k) % P.length;
+      const p = P[idx];
+      if (!p.folded && !p.allin && p.stack > 0) return idx;
+    }
+    return -1;
+  }
+
+  function startSession() {
+    const tbl = TABLES[selTable];
+    if (maybeCastOffer()) return;
+    if (W.cash < tbl.minCash) return;
+    if (maybeCollect()) return;
+    lastSwept = false;
+    handToken++;
+    playerResolve = null;
+    if (G.live) finalizeCurrent();
+    if (W.cash < tbl.minCash) { renderTables(); return; }
+
+    BB = tbl.bb;
+    SB = tbl.sb;
+    START = tbl.buyin;
+    addTx('买入 · ' + tbl.name, -tbl.buyin);
+    saveWallet();
+
+    P.length = 0;
+    P.push(makePlayer(0, YOU));
+    maybeCastDrift();
+    const cast = seatedCast(selTable, G.seats - 1);
+    for (let k = 0; k < G.seats - 1; k++) P.push(makePlayer(k + 1, cast[k]));
+    buildSeats();
+    G.handNo = 0;
+    G.dealer = P.length - 1;
+    G.over = false;
+    G.pot = 0;
+    G.board = [];
+    G.stats = { betFaced: 0, folded: 0, raised: 0, hands: 0, won: 0 };
+    G.specialIn = 10;
+    G.rig = null;
+    hist.length = 0;
+    curHand = null;
+    resetHand();
+    clearTable();
+    renderSeats();
+    el.log.replaceChildren();
+    el.tableTxt.textContent = tbl.name;
+    $('table').dataset.seats = String(G.seats);
+    closeActions();
+    updateEquity();
+    updateReadout();
+    refreshWallet();
+    beginLive();
+    startHand();
+  }
+
+  function startHand() {
+    if (G.over) return;
+    const token = ++handToken;
+    G.handNo++;
+    if (G.specialIn > 0) {
+      G.specialIn--;
+      G.rig = null;
+    } else {
+      G.rig = rnd() < 0.75 ? 'sweet' : 'trap';
+      G.specialIn = 11 + Math.floor(rnd() * 4);
+    }
+    G.dealer = nextLive(G.dealer);
+    if (G.dealer < 0) return;
+    resetHand();
+    G.handStartStack = P[0].stack;
+    clearTable();
+    renderSeats();
+    runHand(token);
+  }
+
+  async function runHand(token) {
+    const live = P.filter((p) => !p.out);
+    if (live.length < 2) { endSession(); return; }
+
+    const sbIdx = nextLive(G.dealer);
+    const bbIdx = nextLive(sbIdx);
+    const firstIdx = nextLive(bbIdx);
+
+    logLine('第 ' + G.handNo + ' 手 · ' + P[G.dealer].name + ' 在按钮位', 'sep');
+
+    const post = (p, amt) => {
+      const a = Math.min(amt, p.stack);
+      p.stack -= a; p.committed += a; p.total += a;
+      if (p.stack === 0) p.allin = true;
+    };
+    post(P[sbIdx], SB);
+    post(P[bbIdx], BB);
+    G.curBet = Math.max(P[sbIdx].committed, P[bbIdx].committed);
+    G.minRaise = BB;
+
+    const deck = [];
+    for (let i = 0; i < 52; i++) deck.push(i);
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+    }
+    let rig = null;
+    if (G.rig) {
+      rig = rigDeal(G.rig, live);
+      if (!rig) G.rig = null;
+    }
+    G.rigBoard = rig ? rig.board : null;
+    G.rigApplied = rig ? G.rig : null;
+    if (rig) {
+      const usedR = new Set();
+      rig.board.forEach((c) => usedR.add(c));
+      for (const h of rig.holes.values()) h.forEach((c) => usedR.add(c));
+      const left = [];
+      for (let c = 0; c < 52; c++) if (!usedR.has(c)) left.push(c);
+      shuffleArr(left);
+      for (const p of live) {
+        const h = rig.holes.get(p);
+        p.hole = h ? h.slice() : [left.pop(), left.pop()];
+      }
+    } else {
+      for (const p of live) p.hole = [deck.pop(), deck.pop()];
+    }
+
+    renderHole();
+    P.forEach((p, idx) => {
+      if (!p.out && seatEls[idx]) setTimeout(() => seatEls[idx].root.classList.add('dealt'), 60);
+    });
+    startRecord();
+    renderSeats();
+    updateEquity();
+    el.stage.textContent = 'PRE-FLOP';
+    await sleep(600);
+    if (token !== handToken) return;
+
+    await bettingRound(firstIdx, token);
+    if (token !== handToken) return;
+
+    const names = ['PRE-FLOP', 'FLOP', 'TURN', 'RIVER'];
+    for (let st = 1; st <= 3; st++) {
+      if (livePlayers().length <= 1) break;
+      G.street = st;
+      G.pot += P.reduce((s, p) => s + p.committed, 0);
+      for (const p of P) { p.committed = 0; p.acted = false; p.lastAct = ''; }
+      G.curBet = 0;
+      G.minRaise = BB;
+
+      const n = st === 1 ? 3 : 1;
+      for (let i = 0; i < n; i++) G.board.push(G.rigBoard ? G.rigBoard[G.board.length] : deck.pop());
+      renderBoard();
+      renderSeats();
+      updateEquity();
+      el.stage.textContent = names[st];
+      await sleep(560);
+      if (token !== handToken) return;
+
+      const canBet = P.filter((p) => !p.folded && !p.allin && !p.out).length >= 2;
+      if (canBet) {
+        await bettingRound(nextToAct(sbIdx - 1), token);
+        if (token !== handToken) return;
+      }
+      if (livePlayers().length <= 1) break;
+    }
+
+    await finishHand(token);
+  }
+
+  /* ---------- 特殊牌局：爽局 / 伪爽局 ---------- */
+  function rigCard(rank, suit) { return rank * 4 + suit; }
+
+  function shuffleArr(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // 爽局：玩家天成葫芦（XXYY 公共牌 + 玩家 X、Z），或同花 AK
+  function buildSweetSpec() {
+    if (rnd() < 0.62) {
+      const X = 8 + Math.floor(rnd() * 5);           // T ~ A
+      const Y = 4 + Math.floor(rnd() * (X - 4));     // 6 ~ X-1
+      const Z = Math.floor(rnd() * 3);               // 2 ~ 4
+      return {
+        board: [rigCard(X, 0), rigCard(X, 1), rigCard(Y, 2), rigCard(Y, 3), rigCard(Z, 0)],
+        you: [rigCard(X, 3), rigCard(Z, 1)]
+      };
+    }
+    const S = Math.floor(rnd() * 4);
+    const o1 = (S + 1) % 4, o2 = (S + 2) % 4;
+    return {
+      board: [rigCard(12, S), rigCard(7, S), rigCard(2, S), rigCard(6, o1), rigCard(10, o2)],
+      you: [rigCard(11, S), rigCard(10, S)],
+      partners: [[rigCard(9, S), rigCard(8, S)], [rigCard(6, S), rigCard(5, S)]]
+    };
+  }
+
+  // 伪爽局：玩家葫芦，但对手里有人是更大的葫芦
+  function buildTrapSpec() {
+    const X = 9 + Math.floor(rnd() * 3);                 // J Q K
+    const Y = X + 1 + Math.floor(rnd() * (12 - X));      // X+1 ~ A
+    const Z = Math.floor(rnd() * 5);
+    let W2 = Math.floor(rnd() * 5);
+    if (W2 === Z) W2 = (W2 + 1) % 5;
+    return {
+      board: [rigCard(X, 0), rigCard(X, 1), rigCard(Y, 3), rigCard(Z, 2), rigCard(W2, 1)],
+      you: [rigCard(X, 3), rigCard(Y, 2)],
+      trapper: [rigCard(Y, 0), rigCard(Y, 1)]
+    };
+  }
+
+  function rigDeal(mode, live) {
+    if (!live.length || live[0] !== P[0]) return null;
+    const spec = mode === 'trap' ? buildTrapSpec() : buildSweetSpec();
+    const you = live[0];
+    const others = live.slice(1);
+    const trapper = mode === 'trap' ? others[0] : null;
+    if (mode === 'trap' && !trapper) return null;
+
+    const used = new Set();
+    spec.board.forEach((c) => used.add(c));
+    spec.you.forEach((c) => used.add(c));
+    if (spec.trapper) spec.trapper.forEach((c) => used.add(c));
+
+    const pool = [];
+    for (let c = 0; c < 52; c++) if (!used.has(c)) pool.push(c);
+
+    const fixed = new Map();
+    fixed.set(you, spec.you.slice());
+    if (trapper) fixed.set(trapper, spec.trapper.slice());
+
+    const score = (h) => eval7(h.concat(spec.board));
+
+    for (let attempt = 0; attempt < 40; attempt++) {
+      shuffleArr(pool);
+      const holes = new Map(fixed);
+      let k = 0;
+      for (const p of others) {
+        if (holes.has(p)) continue;
+        holes.set(p, [pool[k++], pool[k++]]);
+      }
+      const youS = score(holes.get(you));
+      let ok = true;
+
+      if (mode === 'trap') {
+        const trapS = score(holes.get(trapper));
+        if (youS >= trapS) ok = false;
+        if (ok) {
+          for (const p of others) {
+            if (p === trapper) continue;
+            if (score(holes.get(p)) >= trapS) { ok = false; break; }
+          }
+        }
+        if (ok) {
+          for (const p of others) {
+            if (p === trapper) continue;
+            if (score(holes.get(p)) >= youS) { ok = false; break; }
+          }
+        }
+      } else {
+        for (const p of others) {
+          if (score(holes.get(p)) >= youS) { ok = false; break; }
+        }
+      }
+      if (ok) return { board: spec.board, holes };
+    }
+    return null;
+  }
+  function buildPots() {
+    const levels = [...new Set(P.map((p) => p.total))].filter((v) => v > 0).sort((a, b) => a - b);
+    const pots = [];
+    let prev = 0;
+    for (const lv of levels) {
+      let amount = 0;
+      for (const p of P) amount += Math.max(0, Math.min(p.total, lv) - prev);
+      const elig = P.filter((p) => !p.folded && p.total >= lv);
+      if (amount > 0) pots.push({ amount, elig });
+      prev = lv;
+    }
+    return pots;
+  }
+
+  async function finishHand(token) {
+    G.pot += P.reduce((s, p) => s + p.committed, 0);
+    for (const p of P) p.committed = 0;
+    renderSeats();
+    await sleep(240);
+    if (token !== handToken) return;
+
+    G.stats.hands++;
+
+    const live = livePlayers();
+    if (live.length <= 1) {
+      const w = live[0] || P[0];
+      G.lastWinner = w;
+      revealAll();
+      const maxOther = Math.max(0, ...P.filter((q) => q !== w).map((q) => q.total));
+      let pot = G.pot;
+      if (w.total > maxOther) {
+        const extra = w.total - maxOther;
+        w.stack += extra;
+        pot -= extra;
+      }
+      w.stack += pot;
+      G.pot = 0;
+      if (w.you) G.stats.won++;
+      logLine(w.name + ' 收下 ' + NN(pot) + '（其余人弃牌）', 'hl');
+      toast(w.name + ' 赢得底池', NN(pot), w.you ? 'good' : 'bad');
+      endRecord(w.name + ' 赢得 ' + NN(pot) + '（其余人弃牌）', pot);
+      renderSeats();
+      el.pot.textContent = NN(pot);
+      updateEquity();
+      updateReadout();
+      await sleep(2600);
+      if (token !== handToken) return;
+      nextHand(token);
+      return;
+    }
+
+    revealAll();
+    await sleep(850);
+    if (token !== handToken) return;
+
+    el.stage.textContent = 'SHOWDOWN';
+    const scores = new Map();
+    for (const p of live) scores.set(p, eval7(p.hole.concat(G.board)));
+
+    const pots = buildPots();
+    const won = new Map();
+    for (const pot of pots) {
+      if (!pot.elig.length) continue;
+      let best = -1, winners = [];
+      for (const p of pot.elig) {
+        const sc = scores.get(p);
+        if (sc > best) { best = sc; winners = [p]; }
+        else if (sc === best) winners.push(p);
+      }
+      const share = Math.floor(pot.amount / winners.length);
+      let rem = pot.amount - share * winners.length;
+      for (const w of winners) {
+        const add = share + (rem > 0 ? 1 : 0);
+        if (rem > 0) rem--;
+        w.stack += add;
+        won.set(w, (won.get(w) || 0) + add);
+      }
+    }
+
+    G.lastWinner = [...won.keys()].sort((a, b) => (won.get(b) || 0) - (won.get(a) || 0))[0] || null;
+    for (const p of live) logLine(p.name + '：' + describe(p.hole.concat(G.board)), 'bot');
+    for (const [p, amt] of won) {
+      logLine(p.name + ' 赢得 ' + NN(amt), 'hl');
+      if (seatEls[p.i]) seatEls[p.i].root.classList.add('winner');
+    }
+
+    const wonPot = G.pot;
+    G.pot = 0;
+    const youWon = won.has(P[0]);
+    if (youWon) G.stats.won++;
+
+    const summary = [...won.entries()]
+      .map(([p, amt]) => p.name + ' +' + NN(amt)).join('　');
+    endRecord(summary + (youWon ? '' : ''), wonPot);
+
+    if (youWon) {
+      toast('你赢得 ' + NN(won.get(P[0])), describe(P[0].hole.concat(G.board)), 'good');
+    } else {
+      const main = [...won.keys()][0];
+      toast(main.name + ' 赢得 ' + NN(won.get(main)),
+        main === P[0] ? '' : describe(main.hole.concat(G.board)), 'bad');
+    }
+
+    renderSeats();
+    el.pot.textContent = NN(wonPot);
+    updateEquity();
+    updateReadout();
+    await sleep(1900);
+    if (token !== handToken) return;
+    nextHand(token);
+  }
+
+  let breakResolve = null;
+
+  function hideBreak() {
+    el.contbar.classList.remove('on');
+    breakResolve = null;
+  }
+
+  function showBreak() {
+    return new Promise((res) => {
+      breakResolve = res;
+      try {
+        const sessionNet = G.live ? P[0].stack - G.live.buyin : 0;
+        const handNet = P[0].stack - (G.handStartStack || P[0].stack);
+        el.cbTitle.textContent = '第 ' + G.handNo + ' 手结束';
+        el.cbAmt.textContent = (handNet > 0 ? '+' : '') + NN(handNet);
+        el.cbAmt.className = 'cbamt ' + (handNet > 0 ? 'up' : handNet < 0 ? 'down' : 'even');
+        el.cbSub.textContent = '本场 ' + (sessionNet >= 0 ? '+' : '') + NN(sessionNet) +
+          ' 元 · 离桌可得 ¥' + NN(P[0].stack);
+      } catch (e) { /* 结算面板文案出错也不能卡住牌局 */ }
+      el.contbar.classList.remove('min');
+      el.cbMin.textContent = '收起';
+      el.contbar.classList.add('on');
+    });
+  }
+
+  function say(p, text) {
+    const s = seatEls[p.i];
+    if (!s || !s.root) return;
+    let b = s.root.querySelector('.say');
+    if (!b) {
+      b = document.createElement('div');
+      b.className = 'say';
+      s.root.appendChild(b);
+    }
+    b.textContent = text;
+    b.classList.add('on');
+    clearTimeout(p._say);
+    p._say = setTimeout(() => b.classList.remove('on'), 5200);
+  }
+
+  function relOf(cid) {
+    if (!W.rel) W.rel = {};
+    if (!W.rel[cid]) W.rel[cid] = { h: 0, lost: 0, lent: 0 };
+    return W.rel[cid];
+  }
+
+  function tableTalk(delta) {
+    const bots = P.filter((p) => !p.you && !p.out);
+    if (!bots.length || rnd() > 0.62) return;
+    const pick = (a) => a[(rnd() * a.length) | 0];
+    const spk = bots[(rnd() * bots.length) | 0];
+    let text;
+    if (delta < 0) text = spk.q.length && rnd() < 0.55 ? pick(spk.q) : pick(SAY.win);
+    else if (delta > 0) text = spk.q.length && rnd() < 0.45 ? pick(spk.q) : pick(SAY.lose);
+    else text = spk.q.length ? pick(spk.q) : pick(SAY.win);
+    if (W.cash < 400 && rnd() < 0.45) text = pick(SAY.broke);
+    say(spk, text);
+    logLine(spk.name + '：' + text, 'say');
+  }
+
+  function bumpRel(delta, winner) {
+    for (const p of P) {
+      if (p.you || !p.cid) continue;
+      const r = relOf(p.cid);
+      r.h++;
+      if (delta < 0 && winner && winner.cid === p.cid) r.lost += -delta;
+    }
+  }
+  function nextHand(token) {
+    if (G.live) {
+      G.live.hands++;
+      G.live.peak = Math.max(G.live.peak, P[0].stack);
+      saveLive();
+    }
+    const handDelta = P[0].stack - (G.handStartStack || P[0].stack);
+    bumpRel(handDelta, G.lastWinner);
+    tableStory(handDelta);
+    settleLoans();
+    maybeBorrowAsk();
+    tableTalk(handDelta);
+    if (P[0].stack <= 0) { endSession(); return; }
+    if (P.filter((p) => p.stack > 0).length < 2) { endSession(); return; }
+    showBreak().then((choice) => {
+      if (token !== handToken) return;
+      if (choice === 'leave') { endSession(); return; }
+      startHand();
+    });
+  }
+
+  function endSession() {
+    G.over = true;
+    maybeCastDrift();
+    maybeQuirk();
+    const busted = P[0].stack <= 0;
+    lastSwept = !busted && P.every((p) => p.you || p.stack <= 0);
+    const rec = finalizeCurrent();
+    let extra = '';
+    if (rec) {
+      extra = '<br>本场 ' + (rec.net >= 0 ? '+' : '') + NN(rec.net) + ' 元 · 现金 ¥' + NN(W.cash);
+      if (debtTotal() > 0) extra += ' · 欠 ¥' + NN(debtTotal());
+    }
+    el.overlay.classList.remove('hide');
+    showOverlay('menu');
+    el.ovTitle.textContent = busted ? '这桌打完了' : '满载而归';
+    el.ovSub.textContent = busted ? 'BUSTED' : 'SESSION OVER';
+    el.ovText.innerHTML = (busted
+      ? (W.cash >= TABLES[0].buyin
+        ? '这桌的筹码输光了。现金还剩 ¥' + NN(W.cash) + '，换张小桌再战？'
+        : '钱输光了。去钱包里借一点，或者从头再来。')
+      : '你赢下了这张桌子，带走 ' + NN(P[0].stack) + ' 元。') + extra;
+    renderTables();
+    logLine(busted ? '你输光了这桌的筹码' : '牌桌结束', 'hl');
+  }
+
+  /* ============================================================
+     行动
+     ============================================================ */
+  function roundComplete() {
+    const live = livePlayers();
+    if (live.length <= 1) return true;
+    return live.every((p) => p.allin || (p.acted && p.committed === G.curBet));
+  }
+
+  function applyAction(p, a) {
+    const toCall = Math.max(0, G.curBet - p.committed);
+
+    if (p.you) {
+      if (toCall > 0) G.stats.betFaced++;
+      if (a.type === 'fold') G.stats.folded++;
+      if (a.type === 'raise') G.stats.raised++;
+    }
+
+    if (a.type === 'fold') {
+      p.folded = true;
+      p.acted = true;
+      p.lastAct = '弃牌';
+      note(p, '弃牌');
+      playSfx('fold');
+      if (p.you) updateEquity();
+      return;
+    }
+    if (a.type === 'check' || (a.type === 'call' && toCall <= 0)) {
+      p.acted = true;
+      p.lastAct = '过牌';
+      note(p, '过牌');
+      if (p.you) updateEquity();
+      return;
+    }
+    if (a.type === 'call') {
+      const pay = Math.min(toCall, p.stack);
+      p.stack -= pay; p.committed += pay; p.total += pay;
+      if (p.stack === 0) p.allin = true;
+      p.acted = true;
+      p.lastAct = '跟注 ' + NN(pay);
+      note(p, '跟注 ' + NN(pay));
+      if (p.you) updateEquity();
+      return;
+    }
+    if (a.type === 'raise') {
+      const oppMax = Math.max(...others(p).map((q) => q.committed + q.stack), 0);
+      const cap = Math.min(p.committed + p.stack, oppMax);
+      let t = roundBet(Number(a.amount || 0));
+      const minT = Math.min(cap, G.curBet + G.minRaise);
+      t = clamp(t, minT, cap);
+      if (t <= G.curBet) {
+        const pay = Math.min(toCall, p.stack);
+        p.stack -= pay; p.committed += pay; p.total += pay;
+        if (p.stack === 0) p.allin = true;
+        p.acted = true;
+        p.lastAct = '跟注 ' + NN(pay);
+        note(p, '跟注 ' + NN(pay));
+        if (p.you) updateEquity();
+        return;
+      }
+      const wasBet = G.curBet > 0;
+      const raiseBy = t - G.curBet;
+      const pay = t - p.committed;
+      p.stack -= pay; p.committed += pay; p.total += pay;
+      if (raiseBy >= G.minRaise) G.minRaise = raiseBy;
+      G.curBet = t;
+      for (const q of P) q.acted = false;
+      p.acted = true;
+      if (p.stack === 0) p.allin = true;
+      p.lastAct = (wasBet ? '加注 ' : '下注 ') + NN(t);
+      note(p, (wasBet ? '加注到 ' : '下注 ') + NN(t));
+      if (p.you) updateEquity();
+    }
+  }
+
+  function setHint(text, mine) {
+    if (!el.hint) return;
+    el.hint.textContent = text || '';
+    el.hint.className = 'hint' + (text ? (mine ? ' mine' : ' bot') : '');
+  }
+
+  async function takeTurn(p) {
+    const myTok = handToken;
+    const s = seatEls[p.i];
+    if (s) {
+      s.root.classList.add('active');
+      s.tag.textContent = p.you ? '你的行动' : '思考中…';
+      s.tag.className = 'tag on';
+    }
+    setHint(p.you ? '轮到你行动' : p.name + ' 正在思考…', p.you);
+
+    let a;
+    if (p.you) {
+      a = await playerTurn();
+    } else {
+      const t0 = performance.now();
+      a = botDecide(p);
+      const cost = performance.now() - t0;
+      const think = 900 + rnd() * 900;           // 电脑想 0.9~1.8 秒
+      await sleep(Math.max(1400, think - cost));
+    }
+    if (myTok !== handToken) return;
+    setHint('');
+    if (s) s.root.classList.remove('active');
+    if (a) applyAction(p, a);
+    renderSeats();
+  }
+
+  async function bettingRound(firstIdx, token) {
+    let idx = firstIdx;
+    let guard = 0;
+    while (guard++ < 240) {
+      if (token !== handToken) return;
+      if (livePlayers().length <= 1) return;
+      if (roundComplete()) return;
+      const p = P[idx];
+      if (!p.folded && !p.allin && !p.out && p.stack > 0 && (!p.acted || p.committed < G.curBet)) {
+        await takeTurn(p);
+        if (token !== handToken) return;
+        await sleep(50);
+      }
+      idx = (idx + 1) % P.length;
+    }
+  }
+
+  /* ============================================================
+     电脑
+     ============================================================ */
+  function botDecide(p) {
+    const opp = others(p);
+    const nOpp = Math.max(1, opp.length);
+    const pot = potNow();
+    const toCall = Math.max(0, G.curBet - p.committed);
+    const oppMax = Math.max(...opp.map((q) => q.committed + q.stack), 0);
+    const cap = Math.min(p.committed + p.stack, oppMax);
+    const minTotal = Math.min(cap, G.curBet + G.minRaise);
+    const st = p.style;
+    const CHECK = { type: 'check' }, CALL = { type: 'call' }, FOLD = { type: 'fold' };
+
+    const mkRaise = (target) => {
+      let t = roundBet(target);
+      t = Math.max(t, minTotal);
+      t = Math.min(t, cap);
+      if (cap - t < BB && t < cap) t = cap;
+      if (t >= cap * 0.8) t = cap;
+      if (t <= G.curBet) return toCall > 0 ? CALL : CHECK;
+      return { type: 'raise', amount: t };
+    };
+    const betFrac = (f) => mkRaise(p.committed + pot * f);
+    const raiseFrac = (f) => mkRaise(p.committed + toCall + (pot + toCall) * f);
+
+    const iters = G.street === 0 ? 480 : 620;
+    const eq = equityN(p.hole, G.board, iters, nOpp);
+    const fair = 1 / (nOpp + 1);
+    const rel = eq / fair;
+
+    /* ---- 翻牌前 ---- */
+    if (G.street === 0) {
+      const openTo = BB * (2.4 + rnd() * 0.9);
+      const facingRaise = G.curBet > BB;
+      const posFromBtn = (p.i - G.dealer + P.length) % P.length;
+      const late = posFromBtn === 0 || posFromBtn === P.length - 1;
+      const th = P.length === 2 ? 1.5 : (late ? 1.58 : 1.88);
+
+      if (!facingRaise) {
+        if (rel >= th + 0.65) return mkRaise(openTo * 1.35);
+        if (rel >= th) return mkRaise(openTo);
+        if (rel >= th - 0.42) return rnd() < 0.45 ? mkRaise(openTo * 0.9) : (toCall > 0 ? CALL : CHECK);
+        if (rel >= 1.12 * st.tight) return toCall > 0 ? CALL : CHECK;
+        if (toCall === 0) return CHECK;
+        return FOLD;
+      }
+
+      if (rel >= 2.7) return rnd() < 0.5 ? mkRaise(G.curBet * 3) : CALL;
+      if (rel >= 2.05) return rnd() < 0.32 ? mkRaise(G.curBet * 2.8) : CALL;
+      if (rel >= 1.55 && toCall <= p.stack * 0.14) return CALL;
+      if (rel >= 1.3 && toCall <= BB * 1.6) return CALL;
+      return FOLD;
+    }
+
+    /* ---- 翻牌后 ---- */
+    const potOdds = toCall > 0 ? toCall / (pot + toCall) : 0;
+    const k = nOpp - 1;
+    const t1 = 0.45 + 0.035 * k;
+    const t2 = 0.62 + 0.03 * k;
+    const t3 = 0.80 + 0.02 * k;
+    const margin = 0.015 + 0.012 * k;
+    const eqAdj = eq * (0.96 - 0.015 * k);
+    const fr = foldRate();
+    const bluffBonus = 0.6 + fr;
+
+    if (toCall === 0) {
+      if (eq > t3) return betFrac(0.6 + rnd() * 0.18);
+      if (eq > t2) return rnd() < 0.82 ? betFrac(0.52 + rnd() * 0.18) : CHECK;
+      if (eq > t1) return rnd() < 0.55 * st.aggr ? betFrac(0.45) : CHECK;
+      const bluffChance = (0.18 / nOpp) * st.bluff * bluffBonus;
+      if (rnd() < bluffChance) return betFrac(0.55);
+      return CHECK;
+    }
+
+    if (eqAdj > t3 && rnd() < 0.6) return raiseFrac(0.8 + rnd() * 0.35);
+    if (eqAdj > t2) return rnd() < 0.3 * st.aggr ? raiseFrac(0.75) : CALL;
+    if (eqAdj > potOdds + margin + 0.09) return CALL;
+    if (eqAdj > potOdds + margin) return rnd() < 0.55 ? CALL : FOLD;
+    if (eqAdj > potOdds - 0.03 && rnd() < 0.25) return CALL;
+    if (nOpp <= 2 && rnd() < 0.05 * st.bluff * bluffBonus) return raiseFrac(0.9);
+    return FOLD;
+  }
+
+  /* ============================================================
+     玩家操作
+     ============================================================ */
+  function playerOptions() {
+    const p = P[0];
+    const toCall = Math.max(0, G.curBet - p.committed);
+    const maxTotal = p.committed + p.stack;
+    const minTotal = Math.min(maxTotal, G.curBet + G.minRaise);
+    return { toCall, maxTotal, minTotal, canRaise: maxTotal > G.curBet && p.stack > 0 };
+  }
+
+  function updateAmt() {
+    const v = Number(el.slider.value);
+    const isBet = G.curBet === 0;
+    el.amt.innerHTML = (isBet ? '下注 ' : '加注到 ') + '<b>' + NN(v) + '</b>';
+    el.btnRaise.textContent = (isBet ? '下注 ' : '加注到 ') + NN(v);
+  }
+
+  function openActions() {
+    const o = playerOptions();
+    el.bar.classList.remove('idle');
+    el.btnFold.disabled = false;
+    if (o.toCall > 0) {
+      el.btnCall.textContent = '跟注 ' + NN(Math.min(o.toCall, P[0].stack));
+      el.btnCall.dataset.act = 'call';
+    } else {
+      el.btnCall.textContent = '过牌';
+      el.btnCall.dataset.act = 'check';
+    }
+    if (o.canRaise) {
+      el.btnRaise.disabled = false;
+      el.betctrl.classList.add('on');
+      el.slider.min = String(o.minTotal);
+      el.slider.max = String(o.maxTotal);
+      el.slider.step = BB >= 5000 ? '1000' : BB >= 500 ? '100' : BB >= 20 ? '10' : '1';
+      const def = clamp(roundBet(P[0].committed + o.toCall + (potNow() + o.toCall) * 0.66),
+        o.minTotal, o.maxTotal);
+      el.slider.value = String(def);
+      updateAmt();
+    } else {
+      el.btnRaise.disabled = true;
+      el.betctrl.classList.remove('on');
+    }
+  }
+
+  function closeActions() {
+    el.bar.classList.add('idle');
+    el.betctrl.classList.remove('on');
+    el.btnFold.textContent = '弃牌';
+    el.btnCall.textContent = '过牌';
+    el.btnRaise.textContent = '加注';
+  }
+
+  function submit(a) {
+    if (!playerResolve) return;
+    stopShotClock();
+    const r = playerResolve;
+    playerResolve = null;
+    closeActions();
+    r(a);
+  }
+
+  let shotTimer = null;
+
+  function stopShotClock() {
+    if (shotTimer) { clearInterval(shotTimer); shotTimer = null; }
+    if (el.clockBar) {
+      el.clockBar.classList.remove('on', 'warn', 'danger');
+      el.clockFill.style.width = '0%';
+    }
+  }
+
+  function startShotClock() {
+    stopShotClock();
+    let elapsed = 0;
+    let lastSec = 30;
+    setHint('轮到你行动 · 30s', true);
+    el.clockBar.classList.add('on');
+    el.clockBar.classList.remove('warn', 'danger');
+    el.clockFill.style.width = '100%';
+    shotTimer = setInterval(() => {
+      elapsed += 100;
+      const remain = Math.max(0, 1 - elapsed / 30000);
+      el.clockFill.style.width = (remain * 100).toFixed(1) + '%';
+      const secLeft = Math.ceil((30000 - elapsed) / 1000);
+      if (secLeft !== lastSec) {
+        lastSec = secLeft;
+        if (secLeft > 0) {
+          setHint('轮到你行动 · ' + secLeft + 's', true);
+          if (secLeft <= 8) el.hint.className = 'hint danger';
+        }
+        if (secLeft > 0 && secLeft <= 10) playSfx('tick');
+        el.clockBar.classList.toggle('danger', secLeft <= 8);
+        el.clockBar.classList.toggle('warn', secLeft > 8 && secLeft <= 15);
+      }
+      if (elapsed >= 30000) {
+        stopShotClock();
+        playSfx('buzz');
+        const o = playerOptions();
+        const act = o.toCall > 0 ? '弃牌' : '过牌';
+        setHint('思考超时，自动' + act, true);
+        el.hint.className = 'hint danger';
+        logLine('思考超时，自动' + act, 'you');
+        submit(o.toCall > 0 ? { type: 'fold' } : { type: 'check' });
+      }
+    }, 100);
+  }
+
+  function playerTurn() {
+    return new Promise((res) => {
+      playerResolve = res;
+      openActions();
+      startShotClock();
+    });
+  }
+
+  /* ============================================================
+     覆盖层 / 配置
+     ============================================================ */
+  function showOverlay(kind) {
+    el.overlay.classList.remove('hide');
+    if (kind === 'menu') {
+      el.ovTitle.textContent = '德州扑克';
+      el.ovSub.textContent = 'NO-LIMIT HOLD\'EM';
+      el.ovText.innerHTML = '选一张桌子坐下来。对手性格各不相同，<br>紧的、凶的、爱跟的、爱诈唬的，读人比读牌更重要。';
+      el.ovBtn.textContent = '开始游戏';
+    }
+  }
+
+  function modeNeed(seats) {
+    return seats === 2 ? 100000000 : seats === 4 ? 5000000 : 0;
+ }
+  function modeLocked(seats) {
+    const need = modeNeed(seats);
+    return need ? W.cash < need : false;
+  }
+
+  function syncModeBtns() {
+    el.modeSel.querySelectorAll('button').forEach((b) => {
+      const seats = Number(b.dataset.seats);
+      const locked = modeLocked(seats);
+      b.classList.toggle('on', seats === G.seats && !locked);
+      b.classList.toggle('lock', locked);
+      const base = seats === 2 ? '双人场' : seats === 4 ? '四人场' : '六人场';
+      b.textContent = locked ? base + ' · 需 ¥' + NN(modeNeed(seats)) : base;
+    });
+    if (modeLocked(G.seats)) {
+      G.seats = 6;
+      el.modeSel.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('on', Number(b.dataset.seats) === 6);
+      });
+    }
+  }
+
+  /* ============================================================
+     事件
+     ============================================================ */
+  el.btnFold.addEventListener('click', () => submit({ type: 'fold' }));
+  el.btnCall.addEventListener('click', () => {
+    submit({ type: el.btnCall.dataset.act === 'check' ? 'check' : 'call' });
+  });
+  el.btnRaise.addEventListener('click', () => {
+    submit({ type: 'raise', amount: Number(el.slider.value) });
+  });
+  el.slider.addEventListener('input', updateAmt);
+
+  document.querySelectorAll('.presets button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const o = playerOptions();
+      const f = b.dataset.f;
+      let t;
+      if (f === 'allin') t = o.maxTotal;
+      else t = P[0].committed + o.toCall + (potNow() + o.toCall) * Number(f);
+      el.slider.value = String(clamp(roundBet(t), o.minTotal, o.maxTotal));
+      updateAmt();
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { el.review.classList.remove('on'); el.boardDrawer.classList.remove('on'); el.castDrawer.classList.remove('on'); if (el.rebirth) { rbEnd(); el.rebirth.classList.remove('on'); } return; }
+    if (breakResolve && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      el.cbNext.click();
+      return;
+    }
+    if (!playerResolve) return;
+    if (e.key === 'f' || e.key === 'F') submit({ type: 'fold' });
+    else if (e.key === 'c' || e.key === 'C') submit({ type: el.btnCall.dataset.act === 'check' ? 'check' : 'call' });
+    else if (e.key === 'r' || e.key === 'R') submit({ type: 'raise', amount: Number(el.slider.value) });
+  });
+
+  el.ovBtn.addEventListener('click', () => {
+    if (!musicMuted) {
+      try { Music.start(); } catch (e) { /* 音频不可用不影响开局 */ }
+      syncMusic();
+    }
+    if (W.cash < TABLES[selTable].minCash) {
+      if (maybeCastOffer()) return;
+      openWallet();
+      return;
+    }
+    el.overlay.classList.add('hide');
+    startSession();
+  });
+
+  el.ovMusic.addEventListener('click', () => { musicMuted = !Music.toggle(); syncMusic(); });
+  el.btnMusic.addEventListener('click', () => { musicMuted = !Music.toggle(); syncMusic(); });
+
+  el.modeSel.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (modeLocked(Number(b.dataset.seats))) {
+        toast('还没资格', '双人场需要 ¥1亿 资产，四人场需要 ¥500万', 'bad');
+        return;
+      }
+      G.seats = Number(b.dataset.seats);
+      syncModeBtns();
+    });
+  });
+
+
+  function setSide(open) {
+    document.getElementById('app').classList.toggle('side-closed', !open);
+  }
+  let rbTimer = null, rbStartT = 0;
+  function rbEnd() {
+    if (!rbTimer) return;
+    clearInterval(rbTimer);
+    rbTimer = null;
+    el.rbFill.style.width = '0%';
+    el.rbTxt.textContent = '长按 2 秒 · 重获新生';
+  }
+  $('rbHold').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (rbTimer) return;
+    rbStartT = performance.now();
+    el.rbTxt.textContent = '松手即前功尽弃…';
+    rbTimer = setInterval(() => {
+      const pr = Math.min(1, (performance.now() - rbStartT) / 2000);
+      el.rbFill.style.width = (pr * 100) + '%';
+      if (pr >= 1) {
+        clearInterval(rbTimer);
+        rbTimer = null;
+        doReincarnate();
+      }
+    }, 30);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) =>
+    $('rbHold').addEventListener(ev, rbEnd));
+  $('rbCancel').addEventListener('click', () => { rbEnd(); el.rebirth.classList.remove('on'); });
+  $('ovRebirth').addEventListener('click', () => openRebirth());
+
+  $('sideCollapse').addEventListener('click', () => setSide(false));
+  $('sideExpand').addEventListener('click', () => setSide(true));
+
+  $('btnReview').addEventListener('click', () => {
+    renderReview();
+    el.review.classList.add('on');
+  });
+  $('revClose').addEventListener('click', () => el.review.classList.remove('on'));
+  $('revBg').addEventListener('click', () => el.review.classList.remove('on'));
+
+  $('btnMenu').addEventListener('click', () => {
+    handToken++;
+    playerResolve = null;
+    stopShotClock();
+    hideBreak();
+    closeActions();
+    finalizeCurrent();
+    showOverlay('menu');
+    syncModeBtns();
+    renderTables();
+  });
+
+  function openWallet() {
+    renderWallet();
+    el.boardDrawer.classList.add('on');
+  }
+
+  const walletBtns = ['btnWallet', 'btnBoard', 'ovWallet'];
+  for (const id of walletBtns) {
+    const b = $(id);
+    if (b) b.addEventListener('click', openWallet);
+  }
+  $('btnCast').addEventListener('click', () => { renderCast(); el.castDrawer.classList.add('on'); });
+  if (el.ovBoard) el.ovBoard.addEventListener('click', () => { renderCast(); el.castDrawer.classList.add('on'); });
+  $('castClose').addEventListener('click', () => el.castDrawer.classList.remove('on'));
+  $('castBg').addEventListener('click', () => el.castDrawer.classList.remove('on'));
+  el.castBody.addEventListener('click', (e) => {
+    const row = e.target.closest ? e.target.closest('[data-cid]') : null;
+    if (row && row.dataset.cid) { renderCastDetail(row.dataset.cid); return; }
+    const lr = e.target.closest ? e.target.closest('[data-life]') : null;
+    if (lr && lr.dataset.life) renderLifeDetail(Number(lr.dataset.life));
+  });
+  el.cbNext.addEventListener('click', () => {
+    const r = breakResolve;
+    if (!r) return;
+    breakResolve = null;
+    el.contbar.classList.remove('on');
+    r('next');
+  });
+  el.cbMin.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const min = el.contbar.classList.toggle('min');
+    el.cbMin.textContent = min ? '展开' : '收起';
+  });
+  el.cbLeave.addEventListener('click', () => {
+    const r = breakResolve;
+    if (!r) return;
+    breakResolve = null;
+    el.contbar.classList.remove('on');
+    r('leave');
+  });
+
+  $('boardClose').addEventListener('click', () => el.boardDrawer.classList.remove('on'));
+  $('boardBg').addEventListener('click', () => el.boardDrawer.classList.remove('on'));
+
+  el.boardBody.addEventListener('click', (e) => {
+    const btn = e.target.closest ? e.target.closest('button[data-act]') : null;
+    if (!btn) return;
+    if (btn.dataset.act === 'rebirth') {
+      el.boardDrawer.classList.remove('on');
+      openRebirth();
+      return;
+    }
+    if (btn.dataset.act === 'reset') {
+      W = { cash: 2000, bank: 0, shark: 0, peakCash: 2000, tx: [], stats: { games: 0, wins: 0, net: 0, hands: 0, best: 0 } };
+      W.tx.push({ t: Date.now(), label: '重新开始 · 你又带着 2,000 块回来了', amt: 2000, bal: 2000, note: '' });
+      saveWallet();
+      selTable = 0;
+      refreshWallet();
+      renderWallet();
+      renderTables();
+      logLine('全部记录已清空，你重新开始。', 'hl');
+      return;
+    }
+    const kind = btn.dataset.kind;
+    const amt = Number(btn.dataset.amt);
+    if (btn.dataset.act === 'borrow') {
+      const got = borrow(kind, amt);
+      if (got > 0) logLine('借入 ' + NN(got) + ' 元（' + (kind === 'bank' ? '银行' : '高利贷') + '）', 'hl');
+    } else {
+      const paid = repay(kind, amt);
+      if (paid > 0) logLine('还款 ' + NN(paid) + ' 元', 'hl');
+    }
+    renderWallet();
+    renderTables();
+  });
+
+  /* ============================================================
+     启动
+     ============================================================ */
+  buildFan();
+  syncMusic();
+  loadWallet();
+  seedWallet();
+  recoverLive();
+  syncModeBtns();
+  selTable = levelIndex(W.cash);
+  renderTables();
+  // 先摆一副空桌，方便看到背景
+  P.length = 0;
+  P.push(makePlayer(0, YOU));
+  for (let k = 0; k < G.seats - 1; k++) P.push(makePlayer(k + 1, BOTS[k]));
+  buildSeats();
+  resetHand();
+  renderSeats();
+  updateEquity();
+
+  if (location.search.indexOf('auto') >= 0) {
+    el.overlay.classList.add('hide');
+    startSession();
+  }
+  /* ---------- 启动：开场动画 / 横屏 / 离线 ---------- */
+  (function boot() {
+    const intro = document.getElementById('intro');
+    if (intro) {
+      let gone = false;
+      const kill = () => {
+        if (gone) return;
+        gone = true;
+        intro.classList.add('out');
+        setTimeout(() => intro.remove(), 380);
+      };
+      setTimeout(kill, 1350);
+      intro.addEventListener('click', kill);
+      window.addEventListener('pointerdown', kill);
+    }
+
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        document.addEventListener('click', () => {
+          screen.orientation.lock('landscape').catch(() => {});
+        }, { once: true });
+      }
+    } catch (e) { /* 不支持就算了 */ }
+
+    let deferred = null;
+    const instBtn = document.getElementById('btnInstall');
+    window.addEventListener('beforeinstallprompt', (ev) => {
+      ev.preventDefault();
+      deferred = ev;
+      if (instBtn) instBtn.style.display = '';
+    });
+    window.addEventListener('appinstalled', () => {
+      if (instBtn) instBtn.style.display = 'none';
+    });
+    if (instBtn) {
+      instBtn.addEventListener('click', () => {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.then((r) => {
+          if (r && r.outcome === 'accepted' && instBtn) instBtn.style.display = 'none';
+          deferred = null;
+        }).catch(() => {});
+      });
+    }
+    const ua = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(ua) && !window.navigator.standalone && instBtn) {
+      instBtn.style.display = '';
+      instBtn.textContent = '⬇ 分享 → 添加到主屏幕';
+      instBtn.addEventListener('click', () => {
+        alert('点 Safari 底部的「分享」按钮，选择「添加到主屏幕」');
+      });
+    }
+
+    if ('serviceWorker' in navigator &&
+        (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+      void 0;
+    }
+  })();})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
